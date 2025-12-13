@@ -1,0 +1,20 @@
+Q42	P19	Q1860	Where was Douglas Adams born?
+Q76	P26	Q13133	Who is the spouse of Barack Obama?
+Q30	P36	Q61	What is the capital of the United States of America?
+Q64	P17	Q183	Which country is Berlin located in?
+Q937	P50	Q42	Who wrote The Hitchhiker's Guide to the Galaxy?
+Q2	P31	Q1656682	Is Earth a terrestrial planet?
+Q312	P112	Q37020	Who founded Apple Inc.?
+Q5	P279	Q729	Is a human a mammal?
+Q179870	P175	Q1299	Who performed the song "Yesterday"?
+Q42	P570	Q30	Where did Douglas Adams die?
+Q17422	P57	Q56016	Who directed The Matrix?
+Q142	P37	Q150	What is the official language of France?
+Q96	P36	Q2844	What is the capital of Mexico?
+Q148	P21	Q6581097	What is the gender of Albert Einstein?
+Q956	P361	Q11190	Beijing is part of which country?
+Q55	P38	Q4917	What currency is used in the Netherlands?
+Q782	P30	Q18	Hawaii is located in which continent?
+Q11424	P57	Q2599	Who directed Pulp Fiction?
+Q298	P36	Q2887	What is the capital of Chile?
+Q39	P31	Q6256	Is Switzerland a country?

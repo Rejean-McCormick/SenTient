@@ -1,0 +1,76 @@
+[
+  {
+    "uid": "test_001",
+    "description": "Ambiguity: Paris (City) vs Paris Las Vegas (Hotel). Context 'hotel' should favor the specific building.",
+    "surface_form": "Paris",
+    "context": ["The", "Paris", "Hilton", "hotel", "is", "expensive"],
+    "candidates": ["Q90", "Q167646", "Q47796"],
+    "expected_id": "Q167646",
+    "meta": {
+      "Q90": "Paris (Capital of France)",
+      "Q167646": "Paris Las Vegas (Hotel)",
+      "Q47796": "Paris Hilton (Person)"
+    }
+  },
+  {
+    "uid": "test_002",
+    "description": "Ambiguity: Lincoln (Person) vs Lincoln (City). Context 'log cabin' implies the President.",
+    "surface_form": "Lincoln",
+    "context": ["Lincoln", "was", "born", "in", "a", "log", "cabin", "in", "Kentucky"],
+    "candidates": ["Q91", "Q31126", "Q18994"],
+    "expected_id": "Q91",
+    "meta": {
+      "Q91": "Abraham Lincoln",
+      "Q31126": "Lincoln, Nebraska",
+      "Q18994": "Lincoln, UK"
+    }
+  },
+  {
+    "uid": "test_003",
+    "description": "Ambiguity: Apple (Company) vs Apple (Fruit). Context 'iPhone' implies the Tech Giant.",
+    "surface_form": "Apple",
+    "context": ["Apple", "released", "the", "new", "iPhone", "yesterday"],
+    "candidates": ["Q312", "Q89"],
+    "expected_id": "Q312",
+    "meta": {
+      "Q312": "Apple Inc.",
+      "Q89": "Apple (Fruit)"
+    }
+  },
+  {
+    "uid": "test_004",
+    "description": "Ambiguity: Jaguar (Animal) vs Jaguar (Car). Context 'jungle' implies the feline.",
+    "surface_form": "Jaguar",
+    "context": ["The", "Jaguar", "runs", "fast", "in", "the", "rainforest", "jungle"],
+    "candidates": ["Q35694", "Q35936"],
+    "expected_id": "Q35694",
+    "meta": {
+      "Q35694": "Jaguar (Animal)",
+      "Q35936": "Jaguar Cars (Company)"
+    }
+  },
+  {
+    "uid": "test_005",
+    "description": "Property Inference: 'buried in' should boost Location types.",
+    "surface_form": "Marx",
+    "context": ["Marx", "is", "buried", "in", "Highgate", "Cemetery"],
+    "candidates": ["Q9061", "Q1066"],
+    "expected_id": "Q9061",
+    "meta": {
+      "Q9061": "Karl Marx",
+      "Q1066": "Marx Brothers"
+    }
+  },
+  {
+    "uid": "test_006",
+    "description": "Ambiguity: Amazon (River) vs Amazon (Company). Context 'rainforest' vs 'shipping'.",
+    "surface_form": "Amazon",
+    "context": ["The", "Amazon", "is", "the", "longest", "river", "in", "South", "America"],
+    "candidates": ["Q3711", "Q3884"],
+    "expected_id": "Q3711",
+    "meta": {
+      "Q3711": "Amazon River",
+      "Q3884": "Amazon.com"
+    }
+  }
+]
