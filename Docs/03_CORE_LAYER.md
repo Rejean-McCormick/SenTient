@@ -10,12 +10,11 @@
 
 The **Core Layer** is the stable foundation upon which the experimental AI layers rest. It does not perform NLP; it performs **Management**.
 
-**Philosophy:** "The Database in RAM."
-Unlike traditional web apps that query a database per request, the Core loads the entire Project (Rows, Cells, History) into the **Java Heap**. This allows for:
+**Philosophy:** "Hybrid Memory Architecture."
+Unlike the original OpenRefine "Database in RAM" model which hits a hard ceiling with large AI vectors, SenTient adopts a split-state strategy:
 
-1.  **Instant Faceting:** Filtering 100k rows in \< 10ms.
-2.  **Global Transformation:** Applying GREL scripts across the whole dataset instantly.
-3.  **Atomic Consistency:** The project state is always valid.
+1.  **Hot Data (RAM):** Row IDs, Status flags, and Raw text values. This preserves the **Instant Faceting** capability (\< 10ms filtering).
+2.  **Cold Data (DuckDB Sidecar):** Heavy AI payloads (Vectors, Candidate descriptions, Confidence Scores). These are loaded only when the user scrolls them into view.
 
 -----
 
@@ -53,14 +52,14 @@ The most significant modification in SenTient is the extension of the `Cell` and
 ### 3.1. The `Cell` Object
 
 Located in `com.google.refine.model.Cell`.
-It est the atomic unit of storage. In SenTient, it is polymorphic:
+It is the atomic unit of storage. In SenTient, it is polymorphic:
 
   * **Raw State:** Contains only `value` (String/Number).
   * **Reconciled State:** Contains a `recon` object.
 
 ### 3.2. The `EnhancedRecon` Object
 
-We have extended the standard `Recon` class to support the **Consensus Score**.
+We have extended the standard `Recon` class to support the **Consensus Score** and **Lazy Loading**.
 
 **Fields added to Java Class:**
 
@@ -69,11 +68,12 @@ public class Recon {
     // Standard Fields
     public long id;
     public String judgment; // MATCHED, NEW, NONE
-    public List<ReconCandidate> candidates;
-
-    // SenTient Extensions (Transient - not saved to project history to save space)
+    
+    // SenTient Extensions (Lazy Loaded from Sidecar)
+    // NOTE: These are now transient or null until hydrated by DuckDBStore.fetchVisibleRows()
+    public transient List<ReconCandidate> candidates; 
     public transient float consensusScore; 
-    public transient Map<String, Double> featureVector; // {tapioca: 0.9, falcon: 0.2, levenshtein: 0.95}
+    public transient Map<String, Double> featureVector; 
 }
 ```
 
@@ -92,10 +92,14 @@ When the user clicks "Start Reconciliation":
       * Uses `Http2SolrClient` to hit Solr (`/tag`).
       * **Timeout:** **500ms hard limit** (Aligned with `butterfly.properties`). If Solr exceeds this, the search is cancelled (Fail Fast).
 3.  **Ambiguity Check:**
-      * If Solr returns a unique, highly popular candidate, the process is short-circuiter.
+      * If Solr returns a unique, highly popular candidate, the process is short-circuited.
       * If ambiguous, the Core proceeds to Layer 2.
 4.  **Layer 2 Call (Serial/Throttled):**
       * Sends payload to Python (`/disambiguate`) including **Row Context**.
+5.  **Offload (The Sidecar Pattern):**
+      * The `SenTientOrchestrator` does **not** attach the full `Recon` object to the in-memory Cell.
+      * It calls `DuckDBStore.insertBatch()` to persist vectors and candidates to disk.
+      * It flags the Cell as `RECONCILED` (lightweight state) in RAM.
 
 ### 4.2. Consensus Scoring (The Adjudication)
 
@@ -117,12 +121,6 @@ $$Score_{Sentry} = (S_{Normalized} \times 0.4) + (S_{Falcon} \times 0.3) + (S_{L
   * **$S_{Falcon}$:** Pure vector similarity received from Python.
   * **$S_{Levenshtein}$:** Calculated by Java (`editdistance.eval()`) normalized to 0-1 (1.0 = perfect match).
 
-<!-- end list -->
-
-5.  **Update:**
-      * The `Cell.recon` field is updated with the final `consensusScore` and the raw feature vector.
-      * The `History` is *not* updated yet (results are ephemeral until user confirms).
-
 -----
 
 ## 5\. History & Serialization (Safety Net)
@@ -142,6 +140,7 @@ Every action (e.g., "Match Cell to Q42") is a class implementing `AbstractOperat
   * **Format:** JSON (via Jackson) or Binary (Protobuf for large projects).
   * **Storage:** `data/workspace/{project_id}/history/`.
   * **Recovery:** If the server crashes, the Project loads the initial data and re-applies the History log to restore state.
+  * **Note:** The heavy AI data in `DuckDB` is persistent and does not need to be re-serialized during history saves.
 
 -----
 
@@ -165,6 +164,6 @@ To ensure the Core runs smoothly alongside Solr and Python:
 
   * **Heap Allocation:**
       * Recommended: `-Xmx4G` (Configured in `environment.json`).
-      * The Core is memory-hungry. If it runs out of RAM, it will drop the LRU Cache of reconciliation results, forcing a re-fetch.
+      * Thanks to the **DuckDB Sidecar**, this heap is now sufficient for processing datasets \> 5GB, as the heavy lifting is done on disk.
   * **Garbage Collection:**
       * Use G1GC: `-XX:+UseG1GC` to prevent long "Stop-the-world" pauses during batch reconciliation.

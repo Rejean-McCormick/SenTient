@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentient-ai.org/schemas/data/feedback_correction.json",
+  "title": "SenTient Feedback Correction Record",
+  "description": "A record of a manual user override where the AI's high-confidence match was rejected. Used for reinforcement learning and model tuning.",
+  "type": "object",
+  "required": [
+    "id",
+    "surface_form",
+    "correction",
+    "timestamp"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this feedback event."
+    },
+    "project_id": {
+      "type": "integer",
+      "description": "The ID of the project where this correction occurred."
+    },
+    "surface_form": {
+      "type": "string",
+      "description": "The raw cell value that was being reconciled (e.g., 'Paris')."
+    },
+    "context_window": {
+      "type": "array",
+      "description": "The surrounding N-Grams or words used by Falcon to make the decision.",
+      "items": {
+        "type": "string"
+      },
+      "example": ["Hilton", "hotel", "expensive"]
+    },
+    "correction": {
+      "type": "object",
+      "description": "The adjudication details.",
+      "required": ["rejected_id", "accepted_id"],
+      "properties": {
+        "rejected_id": {
+          "type": ["string", "null"],
+          "pattern": "^Q[0-9]+$",
+          "description": "The Wikidata QID the AI selected (e.g., 'Q90'). Null if AI found nothing."
+        },
+        "accepted_id": {
+          "type": ["string", "null"],
+          "pattern": "^Q[0-9]+$",
+          "description": "The Wikidata QID the User selected (e.g., 'Q167646'). Null if User decided it's a new item."
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["WRONG_CONTEXT", "WRONG_SPELLING", "DUPLICATE", "NEW_ENTITY", "OTHER"],
+          "description": "Categorized reason for the rejection."
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "description": "Internal scores at the moment of failure.",
+      "properties": {
+        "ai_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The Consensus Score the AI assigned to the rejected candidate."
+        },
+        "model_version": {
+          "type": "string",
+          "description": "The version of SenTient running during the error (e.g., '1.0.0-RC1')."
+        }
+      }
+    },
+    "user_comment": {
+      "type": "string",
+      "description": "Optional free-text explanation from the user."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the correction was applied."
+    }
+  }
+}

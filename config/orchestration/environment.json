@@ -55,6 +55,8 @@
     "root": "./",
     "data_workspace": "./data/workspace",
     "logs": "./logs",
+    "temp_storage": "./data/workspace/sidecar_db",
+    "feedback_log": "./data/workspace/corrections.json",
     "schemas": {
       "smart_cell": "schemas/data/smart_cell.json",
       "reconciliation_api": "schemas/api/reconciliation_protocol.json"
@@ -73,6 +75,11 @@
       "inter_service_communication_ms": 2000,
       "layer_1_solr_ms": 500,
       "nlp_inference_hard_limit_ms": 15000
+    },
+    "storage": {
+      "engine": "duckdb",
+      "sync_mode": "WAL",
+      "checkpoint_interval_rows": 1000
     },
     "scoring": {
       "sigmoid_k": 2.0,
