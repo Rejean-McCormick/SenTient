@@ -1,0 +1,99 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "30s"
+    },
+    "analysis": {
+      "analyzer": {
+        "falcon_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "falcon_stopwords",
+            "english_possessive_stemmer"
+          ]
+        },
+        "ngram_analyzer": {
+          "type": "custom",
+          "tokenizer": "falcon_edge_ngram",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      },
+      "tokenizer": {
+        "falcon_edge_ngram": {
+          "type": "edge_ngram",
+          "min_gram": 3,
+          "max_gram": 10,
+          "token_chars": ["letter", "digit"]
+        }
+      },
+      "filter": {
+        "falcon_stopwords": {
+          "type": "stop",
+          "stopwords": "_english_"
+        },
+        "english_possessive_stemmer": {
+          "type": "stemmer",
+          "language": "possessive_english"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "pid": {
+        "type": "keyword",
+        "doc_values": true,
+        "ignore_above": 32,
+        "meta": { "description": "The Wikidata Property ID (e.g., P31, P19)." }
+      },
+      "label": {
+        "type": "text",
+        "analyzer": "falcon_analyzer",
+        "similarity": "BM25",
+        "fields": {
+          "raw": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "autocomplete": {
+            "type": "text",
+            "analyzer": "ngram_analyzer",
+            "search_analyzer": "standard"
+          }
+        }
+      },
+      "aliases": {
+        "type": "text",
+        "analyzer": "falcon_analyzer",
+        "position_increment_gap": 100
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "standard",
+        "index": false,
+        "store": true
+      },
+      "usage_count": {
+        "type": "rank_feature",
+        "meta": { "description": "Logarithmic usage frequency of the property in Wikidata to boost common relations." }
+      },
+      "context_vector": {
+        "type": "dense_vector",
+        "dims": 768,
+        "index": true,
+        "similarity": "cosine",
+        "meta": { "description": "BERT/SBERT embedding of the property label+description for semantic context matching." }
+      },
+      "expected_types": {
+        "type": "keyword",
+        "meta": { "description": "List of QIDs (Subject Types) this property typically applies to (e.g., P19 applies to Q5)." }
+      }
+    }
+  }
+}

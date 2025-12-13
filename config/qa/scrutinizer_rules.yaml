@@ -1,0 +1,102 @@
+# ==============================================================================
+# SenTient QA Scrutinizers (Quality Assurance Rules)
+# ==============================================================================
+# These rules are executed by the Orchestrator before any "Export" or "Commit" 
+# operation. They flag potential errors, ambiguities, or constraint violations.
+# ==============================================================================
+
+meta:
+  version: "1.0"
+  strict_mode: false # If true, any ERROR blocks the export process completely.
+
+# ==============================================================================
+# 1. INTEGRITY SCRUTINIZERS (Basic Data Health)
+# ==============================================================================
+integrity:
+  # Flag cells that claim to be 'MATCHED' but lack a valid QID
+  missing_identity:
+    level: "ERROR"
+    condition: "status == 'MATCHED' && (id == null || id == '')"
+    message: "Cell is marked as Matched but contains no Wikidata QID."
+
+  # Ensure the QID format matches the Regex ^Q[0-9]+$
+  invalid_format:
+    level: "ERROR"
+    condition: "id != null && !regex(id, '^Q[0-9]+$')"
+    message: "Invalid Entity ID format. Must be 'Q' followed by numbers."
+
+  # Detect if a Property (P-item) is being used in an Entity slot
+  p_tag_confusion:
+    level: "WARNING"
+    condition: "regex(id, '^P[0-9]+$')"
+    message: "Detected a Property ID (P-tag) in an Entity cell. Verify semantic role."
+
+# ==============================================================================
+# 2. CONFIDENCE SCRUTINIZERS (The SenTient Consensus Logic)
+# ==============================================================================
+confidence:
+  # The "Paris Hilton" Rule:
+  # Flags when an entity is chosen purely for popularity (Tapioca) 
+  # despite the context (Falcon) suggesting it doesn't fit the sentence.
+  popularity_bias_warning:
+    level: "WARNING"
+    condition: "features.tapioca_popularity > 0.9 && features.falcon_context < 0.2"
+    message: "High Popularity but Low Context Similarity. You may have selected a famous entity that does not fit this specific context."
+    remedial_action: "Review Falcon context vectors."
+
+  # The "Tie-Breaker" Rule:
+  # Flags when the top 2 candidates have extremely close scores.
+  ambiguity_alert:
+    level: "WARNING"
+    # If difference between Candidate 1 and Candidate 2 is less than 5%
+    delta_threshold: 0.05 
+    message: "Ambiguous Match. The top two candidates are statistically indistinguishable."
+    remedial_action: "Manual user review required."
+
+  # Low Consensus Warning
+  weak_match:
+    level: "INFO"
+    min_score_threshold: 0.40
+    condition: "consensus_score < 0.40"
+    message: "Match confidence is low. Proceed with caution."
+
+# ==============================================================================
+# 3. WIKIDATA CONSTRAINT SCRUTINIZERS (Schema Alignment)
+# ==============================================================================
+constraints:
+  # Check for common datatype errors before hitting the API
+  date_validity:
+    level: "ERROR"
+    # Matches ISO 8601 (YYYY-MM-DD) or Wikidata precision formats
+    condition: "type == 'time' && !regex(value, '^\\+?[0-9]{4}-[0-9]{2}-[0-9]{2}T00:00:00Z$')"
+    message: "Invalid date format. Wikidata requires ISO 8601 timestamps."
+
+  # Conflicts: e.g., A 'Death Date' cannot be before 'Birth Date'
+  chronology_conflict:
+    level: "ERROR"
+    condition: "exists(P569) && exists(P570) && date(P570) < date(P569)"
+    message: "Logical Error: Date of death precedes date of birth."
+
+  # Cardinality: Single value constraints (e.g., One Capital per Country)
+  single_value_violation:
+    level: "WARNING"
+    properties: ["P36", "P1376"] # Capital, Capital of
+    condition: "count(values) > 1"
+    message: "This property strictly allows only one value per entity."
+
+# ==============================================================================
+# 4. FORMATTING & SANITIZATION (The "Refine" Heritage)
+# ==============================================================================
+formatting:
+  # Detect leading/trailing whitespace that often breaks exact matching
+  invisible_whitespace:
+    level: "INFO"
+    condition: "regex(raw_value, '^\\s+|\\s+$')"
+    message: "Detected un-trimmed whitespace. Recommendation: Apply 'Trim Leading/Trailing Types'."
+    auto_fix_available: true
+
+  # Detect ALL CAPS which usually indicates messy data entry
+  shouting_text:
+    level: "INFO"
+    condition: "regex(raw_value, '^[A-Z0-9\\W]+$') && length(raw_value) > 4"
+    message: "Text is all uppercase. Consider converting to Title Case."

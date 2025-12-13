@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "project": "SenTient",
+    "version": "1.0.0-RC1",
+    "description": "Global environment registry defining service coordinates, resource limits, and file paths for the hybrid architecture."
+  },
+  "runtime": {
+    "mode": "production",
+    "shutdown_strategy": "GRACEFUL",
+    "startup_order": ["datastore_elastic", "index_solr", "nlp_falcon", "core_java"]
+  },
+  "services": {
+    "core_java": {
+      "role": "ORCHESTRATOR",
+      "host": "127.0.0.1",
+      "port": 3333,
+      "health_check_endpoint": "/command/core/get-version",
+      "resources": {
+        "min_heap": "1G",
+        "max_heap": "4G"
+      }
+    },
+    "nlp_falcon": {
+      "role": "SEMANTIC_PROCESSOR",
+      "host": "127.0.0.1",
+      "port": 5005,
+      "entry_point": "src/main.py",
+      "interpreter": "venv/bin/python",
+      "health_check_endpoint": "/api/v1/health",
+      "startup_timeout_seconds": 30,
+      "env_vars": {
+        "FALCON_WORKERS": "4",
+        "FALCON_SETTINGS_PATH": "config/nlp/falcon_settings.yaml"
+      }
+    },
+    "index_solr": {
+      "role": "FAST_TAGGER",
+      "host": "127.0.0.1",
+      "port": 8983,
+      "core_name": "sentient-tapioca",
+      "home_dir": "solr/server/solr",
+      "health_check_endpoint": "/solr/admin/cores?action=STATUS",
+      "startup_timeout_seconds": 45
+    },
+    "datastore_elastic": {
+      "role": "CONTEXT_STORE",
+      "host": "127.0.0.1",
+      "port": 9200,
+      "cluster_name": "sentient-cluster",
+      "required_indices": ["sentient_properties_v1", "sentient_entities_fallback"],
+      "health_check_endpoint": "/_cluster/health"
+    }
+  },
+  "paths": {
+    "root": "./",
+    "data_workspace": "./data/workspace",
+    "logs": "./logs",
+    "schemas": {
+      "smart_cell": "schemas/data/smart_cell.json",
+      "reconciliation_api": "schemas/api/reconciliation_protocol.json"
+    },
+    "models": {
+      "sbert_cache": "./models/sbert",
+      "stopwords": "./data/stopwords/falcon_extended_en.txt"
+    }
+  },
+  "tuning": {
+    "concurrency": {
+      "global_thread_pool": 24,
+      "reconciliation_batch_size": 10
+    },
+    "timeouts": {
+      "inter_service_communication_ms": 2000,
+      "layer_1_solr_ms": 500,
+      "nlp_inference_hard_limit_ms": 15000
+    },
+    "scoring": {
+      "sigmoid_k": 2.0,
+      "sigmoid_m": 3.0
+    },
+    "feature_flags": {
+      "enable_gpu_acceleration": false,
+      "enable_disk_caching": true,
+      "enable_scrutinizers_on_export": true
+    }
+  }
+}

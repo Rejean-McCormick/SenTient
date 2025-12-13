@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentient.io/schemas/data/smart_cell.json",
+  "title": "SenTient SmartCell Artifact",
+  "description": "The atomic unit of data in SenTient. Merges the OpenRefine Cell structure with OpenTapioca candidates and Falcon contextual vectors.",
+  "type": "object",
+  "required": ["id", "raw_value", "fingerprint", "status", "consensus_score"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the cell instance to map async jobs back to the UI."
+    },
+    "raw_value": {
+      "type": ["string", "number", "boolean", "null"],
+      "description": "The original user input (Layer 0)."
+    },
+    "fingerprint": {
+      "type": "string",
+      "description": "The normalized key collision string (lowercase, no punctuation, sorted words) used for local clustering."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["NEW", "PENDING", "AMBIGUOUS", "MATCHED", "REVIEW_REQUIRED"],
+      "default": "NEW",
+      "description": "The current state of the cell in the reconciliation funnel."
+    },
+    "consensus_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "The final weighted confidence score calculated via: (Tapioca * 0.4) + (Falcon * 0.3) + (RefineDist * 0.3)."
+    },
+    "pipeline_trace": {
+      "type": "object",
+      "description": "Debugging metadata to track which pipeline layer modified this cell.",
+      "properties": {
+        "ingested_at": { "type": "string", "format": "date-time" },
+        "tapioca_processed": { "type": "boolean", "default": false },
+        "falcon_processed": { "type": "boolean", "default": false },
+        "job_id": { "type": "string", "description": "Reference to the Async ThreadPoolExecutor job." }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "description": "The container for candidate entities and the winning match.",
+      "properties": {
+        "match": {
+          "$ref": "#/definitions/candidate",
+          "description": "The user-confirmed or auto-matched entity (Golden Record)."
+        },
+        "candidates": {
+          "type": "array",
+          "description": "List of potential entity matches ranked by consensus score.",
+          "items": { "$ref": "#/definitions/candidate" }
+        }
+      }
+    },
+    "nlp_context": {
+      "type": "object",
+      "description": "Contextual data extracted by Falcon 2.0/Python layer.",
+      "properties": {
+        "surrounding_ngrams": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The window of words [-2, +2] around the entity used for context."
+        },
+        "inferred_property": {
+          "type": ["string", "null"],
+          "pattern": "^P[0-9]+$",
+          "description": "The Wikidata Property ID (e.g., P31) that relates this cell to the Subject of the row."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "candidate": {
+      "type": "object",
+      "required": ["id", "label", "types", "scores"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^Q[0-9]+$",
+          "description": "Wikidata QID (e.g., Q42)."
+        },
+        "label": {
+          "type": "string",
+          "description": "The primary label of the entity."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description from Wikidata."
+        },
+        "types": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^Q[0-9]+$" },
+          "description": "List of 'Instance Of' (P31) QIDs for facet filtering."
+        },
+        "scores": {
+          "type": "object",
+          "description": "Detailed breakdown of the scoring components.",
+          "properties": {
+            "popularity": { 
+              "type": "number", 
+              "description": "Log-likelihood/PageRank from Solr/Tapioca." 
+            },
+            "context_match": { 
+              "type": "number", 
+              "description": "Vector similarity score from Falcon." 
+            },
+            "levenshtein": { 
+              "type": "number", 
+              "description": "String distance score (0.0 to 1.0) calculated in Java." 
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentient.io/schemas/api/reconciliation_protocol.json",
+  "title": "SenTient Reconciliation Protocol",
+  "description": "Defines the contract for the Hybrid Reconciliation API. Compliant with W3C/OpenRefine standards while enforcing SenTient's multi-layered scoring data.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/service_manifest_response",
+      "description": "Response structure when the API is queried for metadata (GET)."
+    },
+    {
+      "$ref": "#/definitions/batch_query_request",
+      "description": "Structure for sending a batch of entities to be reconciled (POST)."
+    },
+    {
+      "$ref": "#/definitions/batch_query_response",
+      "description": "Structure of the returned candidates and scores."
+    }
+  ],
+  "definitions": {
+    "batch_query_request": {
+      "type": "object",
+      "description": "A dictionary of queries indexed by arbitrary keys (e.g., 'q0', 'q1').",
+      "patternProperties": {
+        "^q[0-9]+$": {
+          "type": "object",
+          "required": ["query"],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The raw string to reconcile (e.g., 'Paris')."
+            },
+            "limit": {
+              "type": "integer",
+              "default": 3,
+              "description": "Max candidates to return."
+            },
+            "type": {
+              "type": ["string", "array"],
+              "description": "Optional type constraint (e.g., 'Q5' for Human)."
+            },
+            "properties": {
+              "type": "array",
+              "description": "Contextual properties used by Falcon 2.0 to refine matches.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pid": { "type": "string", "description": "Property ID (e.g., 'P17')." },
+                  "v": { "type": ["string", "number"], "description": "Property Value (e.g., 'France')." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "batch_query_response": {
+      "type": "object",
+      "description": "Map of results matching the request keys.",
+      "patternProperties": {
+        "^q[0-9]+$": {
+          "type": "object",
+          "required": ["result"],
+          "properties": {
+            "result": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/candidate" }
+            }
+          }
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["id", "name", "score", "match"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The reconciled Wikidata QID (e.g., 'Q90')."
+        },
+        "name": {
+          "type": "string",
+          "description": "The label of the entity."
+        },
+        "type": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "The final weighted SenTient Consensus Score (0-100)."
+        },
+        "match": {
+          "type": "boolean",
+          "description": "True if the consensus score exceeds the confidence threshold (auto-match)."
+        },
+        "features": {
+          "type": "object",
+          "description": "SenTient-exclusive scoring breakdown for UI visualization.",
+          "required": ["tapioca_popularity", "falcon_context", "levenshtein_distance"],
+          "properties": {
+            "tapioca_popularity": {
+              "type": "number",
+              "description": "Raw log-likelihood from Solr/Tapioca layer."
+            },
+            "falcon_context": {
+              "type": "number",
+              "description": "Cosine similarity of context vectors from Falcon layer."
+            },
+            "levenshtein_distance": {
+              "type": "number",
+              "description": "String edit distance calculated in Java Core."
+            },
+            "exact_label_match": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "service_manifest_response": {
+      "type": "object",
+      "required": ["name", "identifierSpace", "schemaSpace", "defaultTypes"],
+      "properties": {
+        "name": { "type": "string", "const": "SenTient Hybrid Reconciliation" },
+        "identifierSpace": { "type": "string", "const": "http://www.wikidata.org/entity/" },
+        "schemaSpace": { "type": "string", "const": "http://www.wikidata.org/prop/direct/" },
+        "view": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "default": "https://www.wikidata.org/wiki/{{id}}" }
+          }
+        },
+        "defaultTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

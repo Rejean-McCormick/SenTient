@@ -1,0 +1,95 @@
+# ==============================================================================
+# SenTient NLP Configuration (Falcon Layer)
+# ==============================================================================
+# Controls the Semantic Relation Extraction and Contextual Re-ranking service.
+# ==============================================================================
+
+server:
+  host: "0.0.0.0"
+  port: 5005
+  workers: 4  # Number of Gunicorn workers for parallel processing
+  timeout: 120 # Seconds before killing a long-running NLP task
+
+elasticsearch:
+  hosts: ["http://localhost:9200"]
+  # Index names must match config/elastic/falcon_mapping.json
+  indexes:
+    properties: "sentient_properties_v1"
+    entities: "sentient_entities_fallback" 
+  connection:
+    timeout: 30
+    max_retries: 3
+    retry_on_timeout: true
+
+# ==============================================================================
+# 1. PRE-PROCESSING STRATEGIES (The "Compression" Logic)
+# ==============================================================================
+preprocessing:
+  language: "en"
+  # Aggressive stopword removal to isolate predicates (e.g., "is buried in" -> "buried")
+  # File path relative to the Python service root
+  stopwords_file: "data/stopwords/falcon_extended_en.txt"
+  
+  # Regex to clean surface forms before N-Gram generation
+  clean_regex: "[^a-zA-Z0-9\\s]"
+  
+  # N-Gram Window for Relation Extraction (e.g., "Mayor of Paris" -> 3-gram)
+  ngrams:
+    min_length: 1
+    max_length: 6 
+
+# ==============================================================================
+# 2. EMBEDDING MODEL (The Contextual Vector Logic)
+# ==============================================================================
+embeddings:
+  # Using a lightweight SBERT model for speed/accuracy trade-off
+  model_name: "all-MiniLM-L6-v2"
+  cache_dir: "./models/cache"
+  device: "cpu" # Set to "cuda" if GPU is available
+  normalize_embeddings: true # Required for Cosine Similarity calculation
+
+# ==============================================================================
+# 3. RE-RANKING STRATEGIES (The "Hybrid" Logic)
+# ==============================================================================
+ranking:
+  # Strategy 1: Levenshtein Post-Processing (The "Falcon Double-Check")
+  # [CRITICAL UPDATE] Disabled to resolve conflict with Layer 3 (Java Core).
+  # The Architecture Blueprint (02_SEMANTIC_LAYER.md) states that Falcon must
+  # NOT apply string penalties, as the Java Core applies them independently
+  # for the UI visualization.
+  levenshtein:
+    enabled: false
+    max_distance_threshold: 2  
+    exact_match_boost: 2.0     
+    near_match_penalty: 0.5    
+
+  # Strategy 2: Contextual Similarity (Vector Dot Product)
+  # Used to rank candidates based on the surrounding sentence
+  context:
+    window_size: 5  # Number of words left/right of the entity to include in context vector
+    weight: 0.7     # Importance of context vs. lexical match in final score
+
+# ==============================================================================
+# 4. THRESHOLDS (The "Decision" Logic)
+# ==============================================================================
+thresholds:
+  # Minimum combined score to return a candidate at all
+  min_confidence: 0.35
+  
+  # Score above which we consider the entity "Automatically Matched" (Status: MATCHED)
+  auto_match_cutoff: 0.85
+  
+  # Maximum number of candidates to return to the Java Core
+  # [PERFORMANCE UPDATE] Reduced from 5 to 3 to prevent CPU thrashing.
+  # Since we are running SBERT on CPU (see 'embeddings.device'), calculating 
+  # vectors for 5 candidates per row often exceeds the 200ms latency budget.
+  max_candidates: 3
+
+# ==============================================================================
+# 5. CACHING (The "Cold Cache" Logic)
+# ==============================================================================
+cache:
+  enabled: true
+  backend: "redis" # or "memory" for dev
+  redis_url: "redis://localhost:6379/0"
+  ttl_seconds: 86400 # 24 Hours
