@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# ==============================================================================
+# SenTient Startup Script (Linux/macOS)
+# ==============================================================================
+# Role: Bootloader for the Java Core Orchestrator (Layer 3).
+# Usage: ./refine
+# ==============================================================================
+
+# 1. Resolve Home Directory
+# ------------------------------------------------------------------------------
+# Get the physical path of this script to establish SENTIENT_HOME
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+export REFINE_HOME="$DIR"
+
+# 2. Load Configuration
+# ------------------------------------------------------------------------------
+# Read JVM arguments (Memory, GC) from refine.ini
+if [ -f "$REFINE_HOME/refine.ini" ]; then
+    source "$REFINE_HOME/refine.ini"
+fi
+
+# Set defaults if refine.ini is missing
+if [ -z "$REFINE_MEMORY" ]; then
+    REFINE_MEMORY="1400M"
+fi
+
+if [ -z "$JAVA_OPTIONS" ]; then
+    JAVA_OPTIONS="-XX:+UseG1GC -Drefine.port=3333"
+fi
+
+# 3. Java Environment Check
+# ------------------------------------------------------------------------------
+if [ -z "$JAVA_HOME" ]; then
+    JAVA="java"
+else
+    JAVA="$JAVA_HOME/bin/java"
+fi
+
+# Verify Java 17+
+JAVA_VERSION=$("$JAVA" -version 2>&1 | awk -F '"' '/version/ {print $2}')
+echo "SenTient Bootloader: Found Java version $JAVA_VERSION"
+
+# 4. Construct Classpath
+# ------------------------------------------------------------------------------
+# We must include:
+# - The Servlet Container (Jetty)
+# - The Core Application (Refine)
+# - The New Storage Drivers (DuckDB)
+# - The Extensions (Wikibase, Solr)
+
+CP=""
+
+# Add Core Libraries
+for jar in "$REFINE_HOME"/server/lib/*.jar; do
+    if [ -z "$CP" ]; then CP="$jar"; else CP="$CP:$jar"; fi
+done
+
+# Add Webapp Libraries (Core Logic)
+for jar in "$REFINE_HOME"/webapp/WEB-INF/lib/*.jar; do
+    CP="$CP:$jar"
+done
+
+# Add Extension Libraries (DuckDB, Solr, Wikibase)
+# Note: 'extensions' folder layout is usually extensions/name/module/lib/
+for jar in "$REFINE_HOME"/extensions/*/module/lib/*.jar; do
+    CP="$CP:$jar"
+done
+
+# 5. Launch Orchestrator
+# ------------------------------------------------------------------------------
+echo "Starting SenTient Core..."
+echo "  Memory:  $REFINE_MEMORY"
+echo "  Home:    $REFINE_HOME"
+echo "  Options: $JAVA_OPTIONS"
+
+exec "$JAVA" \
+    -cp "$CP" \
+    $JAVA_OPTIONS \
+    -Xms"$REFINE_MEMORY" -Xmx"$REFINE_MEMORY" \
+    -Drefine.home="$REFINE_HOME" \
+    -Drefine.webapp="$REFINE_HOME/webapp" \
+    com.google.refine.Refine

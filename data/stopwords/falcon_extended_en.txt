@@ -1,0 +1,143 @@
+# ==============================================================================
+# SenTient Extended Stopwords (Falcon Layer)
+# ==============================================================================
+# This list is used by 'src/falcon/preprocessing.py' to clean input text
+# before generating N-Grams or Context Vectors.
+#
+# Strategy: Aggressive Pruning.
+# We remove not just grammatical glue (the, is, at) but also
+# structural noise common in data dumps (http, www, null).
+# ==============================================================================
+
+# --- Standard English Grammar ---
+the
+of
+and
+to
+a
+in
+is
+it
+you
+that
+he
+was
+for
+on
+are
+as
+with
+his
+they
+at
+be
+this
+have
+from
+or
+one
+had
+by
+word
+but
+not
+what
+all
+were
+we
+when
+your
+can
+said
+there
+use
+an
+each
+which
+she
+do
+how
+their
+if
+will
+up
+other
+about
+out
+many
+then
+them
+these
+so
+some
+her
+would
+make
+like
+him
+into
+time
+has
+look
+two
+more
+write
+go
+see
+number
+no
+way
+could
+people
+my
+than
+first
+water
+been
+call
+who
+oil
+its
+now
+find
+
+# --- Data Artifacts & Structural Noise ---
+# Common in CSV/Excel exports
+null
+nan
+n/a
+undefined
+none
+nil
+http
+https
+www
+com
+org
+net
+html
+php
+jsp
+asp
+aspx
+
+# --- Corporate & Legal Fluff ---
+# These words dilute the "uniqueness" of an entity name
+inc
+llc
+ltd
+corp
+corporation
+limited
+company
+gmbh
+pte
+co
+dept
+department
+group
+holdings
+plc
+sa
+nv
+bv

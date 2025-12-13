@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "SenTient",
-    "version": "1.0.0-RC1",
+    "version": "1.0.0-RC2",
     "description": "Global environment registry defining service coordinates, resource limits, and file paths for the hybrid architecture."
   },
   "runtime": {

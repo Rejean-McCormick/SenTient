@@ -5,7 +5,7 @@
 # ==============================================================================
 
 server:
-  host: "0.0.0.0"
+  host: "127.0.0.1" # [SECURITY] Bind strictly to localhost (Docs/05_WIRING.md)
   port: 5005
   workers: 4  # Number of Gunicorn workers for parallel processing
   timeout: 120 # Seconds before killing a long-running NLP task
