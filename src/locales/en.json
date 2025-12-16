@@ -28,4 +28,7 @@
     "dialog": {
       "title": "Reconcile with Knowledge Graph",
       "service_label": "Reconciliation Service",
-      "mode_label
+      "mode_label": "Mode"
+    }
+  }
+}
