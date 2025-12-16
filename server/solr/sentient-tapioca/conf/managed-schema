@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<schema name="sentient-tapioca" version="1.6">
+
+  <fieldType name="string" class="solr.StrField" sortMissingLast="true" />
+  <fieldType name="long" class="solr.LongPointField" docValues="true"/>
+  <fieldType name="float" class="solr.FloatPointField" docValues="true"/>
+  <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true"/>
+
+  <fieldType name="text_tagger" class="solr.TextField" positionIncrementGap="100" postingsFormat="FST50">
+    <analyzer type="index">
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.EnglishPossessiveFilterFactory"/>
+      <filter class="solr.ASCIIFoldingFilterFactory" preserveOriginal="true"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+    </analyzer>
+    <analyzer type="query">
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.EnglishPossessiveFilterFactory"/>
+      <filter class="solr.ASCIIFoldingFilterFactory" preserveOriginal="true"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+    </analyzer>
+  </fieldType>
+
+  <fieldType name="text_general" class="solr.TextField" positionIncrementGap="100">
+    <analyzer>
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+    </analyzer>
+  </fieldType>
+
+  <field name="id" type="string" indexed="true" stored="true" required="true" multiValued="false" />
+  
+  <field name="_version_" type="long" indexed="true" stored="true"/>
+
+  <field name="text" type="text_tagger" indexed="true" stored="true" multiValued="true" omitNorms="true" />
+
+  <field name="label" type="string" indexed="false" stored="true" multiValued="false" />
+  <field name="description" type="text_general" indexed="false" stored="true" multiValued="false" />
+
+  <field name="popularity_score" type="float" indexed="true" stored="true" docValues="true" multiValued="false" default="0.0" />
+
+  <field name="types" type="string" indexed="true" stored="true" multiValued="true" />
+
+  <field name="blob" type="string" indexed="false" stored="true" multiValued="false" />
+
+  <uniqueKey>id</uniqueKey>
+
+  <copyField source="label" dest="text"/>
+
+</schema>

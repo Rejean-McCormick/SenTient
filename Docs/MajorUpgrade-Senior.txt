@@ -1,0 +1,434 @@
+This is the **Strategic Roadmap for the SenTient v1.1 Upgrade**.
+
+On a grand scale, we are moving the system from a "Research Prototype" (monolithic, fragile, English-only) to an **"International Enterprise Platform"** (modular, contract-driven, robust).
+
+This transformation relies on **5 Strategic Pillars**.
+
+###**Pillar 1: The "Contract-First" Foundation****Goal:** Elimination of Integration Drift.
+Instead of the Frontend and Backend "guessing" what the data looks like, we are locking the doors. We define strict **JSON Schemas** (Contracts) first.
+
+* **The Upgrade:** Both the Java Core (Orchestrator) and Python Layer (Falcon) must validate every single data packet against the `SmartCell` and `Reconciliation` protocols.
+* **The Result:** If an API response is malformed, the system catches it at the source, preventing UI crashes.
+
+###**Pillar 2: The "Golden Variable" Nervous System****Goal:** Total System Alignment.
+We are eradicating "Magic Numbers" and hardcoded paths. A single **System Alignment Registry** will act as the source of truth for all 4 services (Java, Python, Solr, Elastic).
+
+* **The Upgrade:** All services will bind strictly to `127.0.0.1` using the standardized ports (`3333`, `5005`, `8983`, `9200`) defined in the central configuration.
+* **The Result:** You can change a port in *one* file, and the entire fleet (Frontend Proxy, Java Backend, Python Client) updates instantly.
+
+###**Pillar 3: The "Hybrid Memory" Architecture****Goal:** Processing Infinite Data on Finite RAM.
+We are changing the physical state management of the application.
+
+* **The Upgrade:** The application will no longer try to hold the entire AI worldview in RAM. We are implementing the **Sidecar Pattern**, where heavy vectors and AI context are offloaded to **DuckDB** on disk, while only "Hot Data" (UI Facets) remains in Heap.
+* **The Result:** SenTient can process 10 million rows on a standard laptop without crashing.
+
+###**Pillar 4: Internationalization (i18n) & Canonicalization****Goal:** Global Readiness & Deployment Sanity.
+We are preparing the code for the world and for the cloud.
+
+* **The Upgrade (i18n):** We are stripping all English text from the Java and React codebases, replacing them with Resource Bundles (`Messages.properties` / `en.json`).
+* **The Upgrade (Ops):** We are enforcing **Canonical Paths**. No more `python_venv` or duplicate `solr/` folders. We use standard `requirements.txt` and a single `server/solr/` directory to ensure the build is deterministic.
+
+###**Pillar 5: The "Immune System" (QA Gates)****Goal:** Automated Data Integrity.
+We are turning Quality Assurance into a runtime requirement, not an afterthought.
+
+* **The Upgrade:** **Scrutinizers** are promoted to "Gatekeepers." The system will logically refuse to export data that violates the "Paris Hilton Rule" (popularity bias) or Wikidata constraints.
+* **The Result:** The system protects the user from polluting the Knowledge Graph with bad data.
+
+---
+
+###**The Master Workflow**1. **Define Contracts** (Schemas) \rightarrow Ensures everyone speaks the same language.
+2. **Align Config** (Golden Variables) \rightarrow Ensures everyone knows *where* to speak.
+3. **Refactor Core** (Java/DuckDB) \rightarrow Ensures the brain can handle the load.
+4. **Standardize Services** (Python/Solr) \rightarrow Ensures the limbs move reliably.
+5. **Upgrade UI** (React + i18n) \rightarrow Ensures the user sees a polished, global product.
+
+
+This is the correct engineering approach. Before writing a single line of logic, we must define the **"Golden Variables"**—the immutable constants that bridge the gap between Java, Python, and the Browser.
+
+Below is the **System Alignment Registry**. I will use these exact values in every file I generate today. If we change a variable here, we change it everywhere.
+
+###1. The System Alignment Registry (Golden Variables)These are the hard-coded contracts derived from your architecture.
+
+####**A. Network Topology (Ports & Hosts)*** **`CORE_HOST`**: `127.0.0.1` (Strict Localhost)
+* **`CORE_PORT`**: `3333` (Java Orchestrator / UI)
+* **`FALCON_HOST`**: `127.0.0.1`
+* **`FALCON_PORT`**: `5005` (Python NLP Service)
+* **`SOLR_HOST`**: `127.0.0.1`
+* **`SOLR_PORT`**: `8983` (Tapioca Tagger)
+* **`ELASTIC_HOST`**: `127.0.0.1`
+* **`ELASTIC_PORT`**: `9200` (Context Store)
+
+####**B. Canonical File Paths (Relative to Root)*** **`SOLR_CORE_PATH`**: `server/solr/sentient-tapioca` (The new canonical location)
+* **`PYTHON_DEPS`**: `src/requirements.txt` (Replacing `python_venv`)
+* **`DUCKDB_PATH`**: `data/workspace/sidecar_db`
+
+####**C. Data Schema Keys (The "Smart Cell" Contract)*** **`KEY_ID`**: `"id"` (UUID for the cell transaction)
+* **`KEY_STATUS`**: `"status"` (Enum: `NEW`, `PENDING`, `MATCHED`, `AMBIGUOUS`)
+* **`KEY_SCORE`**: `"consensus_score"` (Float 0.0 - 1.0)
+* **`KEY_CANDIDATES`**: `"candidates"` (Array of objects)
+* **`KEY_VECTOR`**: `"vector"` (Heavy payload, stored in DuckDB)
+
+---
+
+###Phase 1: Repo Hygiene & ContractsNow applying these variables to the first batch of files.
+
+####1. `package.json` (Cleanup & Alignment)* **Change:** Updated `proxy` to use `CORE_PORT` (3333).
+* **Change:** Added `engines` to enforce Node version.
+* **Change:** Added explicit `i18n` dependencies as discussed.
+
+```json
+{
+  "name": "sentient-frontend",
+  "private": true,
+  "version": "1.0.0-RC3",
+  "type": "module",
+  "description": "The React-based Frontend for the SenTient Hybrid Reconciliation System.",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "vite --port 3000",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest",
+    "e2e": "cypress run"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "i18next": "^23.7.6",
+    "react-i18next": "^13.5.0",
+    "i18next-http-backend": "^2.4.1",
+    "@tanstack/react-query": "^5.8.4",
+    "@tanstack/react-virtual": "^3.0.0",
+    "react-window": "^1.8.10",
+    "@mui/material": "^5.14.18",
+    "@mui/icons-material": "^5.14.18",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "axios": "^1.6.2",
+    "clsx": "^2.0.0",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0",
+    "cypress": "^13.6.0",
+    "eslint": "^8.53.0"
+  },
+  "proxy": "http://127.0.0.1:3333"
+}
+
+```
+
+####2. `src/requirements.txt` (The Deterministic Python Build)* **Change:** Replaces the messy `python_venv` folder.
+* **Change:** Pins exact versions to ensure Falcon runs reliably.
+
+```text
+# SenTient Falcon Layer - Dependency Lockfile
+# Usage: pip install -r src/requirements.txt
+
+# Core Framework
+Flask==3.0.0
+gunicorn==21.2.0
+requests==2.31.0
+
+# NLP & Vectors (CPU Optimized)
+sentence-transformers==2.2.2
+torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+numpy==1.26.0
+scikit-learn==1.3.2
+scipy==1.11.3
+
+# Data Stores
+elasticsearch==8.11.0
+redis==5.0.1
+
+# Utilities
+PyYAML==6.0.1
+jsonschema==4.20.0  # For validating SmartCell contracts
+
+```
+
+####3. `schemas/data/smart_cell.json` ( The Contract)* **Critical:** This schema enforces the keys (`id`, `status`, `consensus_score`) defined in our registry.
+* **Usage:** Java `Cell` objects and Python `pipeline.py` must validate against this.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SmartCell Protocol",
+  "description": "Defines the atomic unit of data storage for SenTient.",
+  "type": "object",
+  "required": ["id", "raw_value", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique transaction ID for this cell."
+    },
+    "raw_value": {
+      "type": "string",
+      "description": "The immutable user input."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["NEW", "PENDING", "MATCHED", "AMBIGUOUS", "REVIEW_REQUIRED"],
+      "default": "NEW"
+    },
+    "consensus_score": {
+      "type": ["number", "null"],
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Final confidence score calculated by Java Core."
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^Q[0-9]+$" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "features": {
+            "type": "object",
+            "properties": {
+              "tapioca_popularity": { "type": "number" },
+              "falcon_context": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "vector_ref": {
+      "type": ["string", "null"],
+      "description": "Pointer to the heavy vector payload in DuckDB (Sidecar)."
+    }
+  }
+}
+
+```
+
+####4. `schemas/api/reconciliation_protocol.json` (The API Contract)* **Critical:** Defines exactly what the Frontend sends to port `3333`.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Reconciliation Command Protocol",
+  "type": "object",
+  "required": ["columnName", "mode"],
+  "properties": {
+    "columnName": {
+      "type": "string",
+      "description": "The target column to reconcile."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["standard-service"],
+      "default": "standard-service"
+    },
+    "service": {
+      "type": "string",
+      "format": "uri",
+      "description": "The internal endpoint for the reconciler (usually Falcon/Solr loop)."
+    },
+    "contextColumns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Other columns to use for semantic context (e.g., 'Description', 'Year')."
+    }
+  }
+}
+
+```
+
+####5. `schemas/data/feedback_correction.json` (The Learning Loop)* **Critical:** This schema governs what we save to `data/workspace/corrections.json` for future model retraining.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Feedback Correction Log",
+  "type": "object",
+  "required": ["id", "original_input", "rejected_candidate", "accepted_candidate"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "original_input": { "type": "string" },
+    "context_snapshot": { "type": "string" },
+    "rejected_candidate": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "score": { "type": "number" }
+      }
+    },
+    "accepted_candidate": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "user_comment": { "type": "string" }
+  }
+}
+
+```
+
+---
+
+###**Next Step**Phase 1 is complete. The contracts are locked.
+
+Would you like me to generate **Phase 2 (Configuration)**? This will involve writing the `environment.json` and `butterfly.properties` files, populating them with the "Golden Variables" (Ports 3333, 5005, 8983) and ensuring the new `i18n` paths are registered.
+
+To ensure the "Variable Fixing" and "System Alignment" is permanently recorded and accessible to the team, I have generated the updated documentation below.
+
+This content serves as the **Single Source of Truth** for the upgrade. It consolidates the variables defined in the previous steps into the project documentation.
+
+###**Action:**Update `Docs/05_WIRING_AND_CONFIG.md` and `Docs/04_DATA_DICTIONARY.md` with the following content.
+
+---
+
+###**1. Updated: `Docs/05_WIRING_AND_CONFIG.md**`This file now includes the "System Alignment Registry" (Golden Variables) and the new containerization/i18n paths.
+
+```markdown
+# Wiring & Configuration Strategy (v1.1 - System Alignment Upgrade)
+
+**Component:** System Orchestration
+**Config Source:** `config/orchestration/environment.json`
+**Status:** **LOCKED** (Do not hardcode ports in code; use variables below).
+
+---
+
+## 1. The System Alignment Registry ("Golden Variables")
+
+These immutable constants bridge the gap between Java, Python, and the Browser. All services must bind strictly to `127.0.0.1` (Localhost) for security.
+
+| Variable Name | Value | Description | bound Context |
+| :--- | :--- | :--- | :--- |
+| **`CORE_HOST`** | `127.0.0.1` | The Java Orchestrator / UI Host | `application.host` |
+| **`CORE_PORT`** | `3333` | **Entry Point.** The User Interface & API | `server.port` |
+| **`FALCON_HOST`** | `127.0.0.1` | Python NLP Service Host | `falcon.host` |
+| **`FALCON_PORT`** | `5005` | Semantic Vector Service | `falcon.port` |
+| **`SOLR_HOST`** | `127.0.0.1` | Solr Search Host | `solr.host` |
+| **`SOLR_PORT`** | `8983` | Fast Entity Tagger (Tapioca) | `solr.port` |
+| **`ELASTIC_HOST`** | `127.0.0.1` | Context Store Host | `elastic.host` |
+| **`ELASTIC_PORT`** | `9200` | Property Vector Store | `elastic.port` |
+
+> **Critical Upgrade Note:** The legacy `python_venv` directory has been deprecated. All Python dependencies are now strictly managed via `src/requirements.txt` to ensure deterministic builds.
+
+---
+
+## 2. Canonical File Paths
+
+To prevent "Path Drift" between development environments (Mac/Linux/Windows), use these relative paths from `SENTIENT_HOME`.
+
+### A. Data & Logic
+| Logical Key | Path (Relative) | Role |
+| :--- | :--- | :--- |
+| **`SOLR_CORE_PATH`** | `server/solr/sentient-tapioca` | **Canonical** location for Solr cores. (Deleted `solr/` root). |
+| **`PYTHON_DEPS`** | `src/requirements.txt` | Lockfile for Falcon service. |
+| **`DUCKDB_PATH`** | `data/workspace/sidecar_db` | Off-heap storage for heavy vectors. |
+| **`I18N_PATH`** | `modules/core/src/com/google/refine/i18n/` | Java resource bundles (`Messages.properties`). |
+
+### B. Configuration Stores
+| Config File | Responsible Layer | Key Variables |
+| :--- | :--- | :--- |
+| `environment.json` | **Global** | `CORE_PORT`, `FALCON_PORT` |
+| `butterfly.properties` | **Java Core** | `butterfly.modules.path`, `solr.url` |
+| `falcon_settings.yaml` | **Python** | `workers`, `model_name` |
+| `package.json` | **Frontend** | `proxy`, `i18n` deps |
+
+---
+
+## 3. Network Topology Diagram
+
+
+
+```mermaid
+graph TD
+    User[User Browser] -->|HTTP :3333| Core(Java Core Orchestrator)
+    
+    subgraph "Layer 3: Orchestration (Port 3333)"
+    Core -->|Read/Write| DB[(DuckDB Sidecar)]
+    Core -->|Load| I18N[i18n Bundles]
+    end
+    
+    subgraph "Layer 1: Speed (Port 8983)"
+    Core -->|HTTP/2 :8983| Solr[Solr FST Tagger]
+    end
+    
+    subgraph "Layer 2: Semantics (Port 5005)"
+    Core -->|HTTP :5005| Falcon[Python NLP Service]
+    Falcon -->|TCP :9200| Elastic[(ElasticSearch)]
+    end
+
+```
+
+---
+
+###**2. Updated: `Docs/04_DATA_DICTIONARY.md**`This file now documents the **SmartCell Protocol** schema we defined in the plan, ensuring the data contract is clear.
+
+```markdown
+# Data Dictionary & Type Mapping (v1.1)
+
+**Artifact:** `SmartCell` Protocol
+**Schema Source:** `schemas/data/smart_cell.json`
+**Status:** **ENFORCED** (Java and Python must validate against this).
+
+---
+
+## 1. The SmartCell Contract (Keys)
+
+The following keys are **immutable**. Any deviation will cause serialization errors in the `SenTientOrchestrator`.
+
+| JSON Key | Type | Description |
+| :--- | :--- | :--- |
+| **`id`** | `UUID` | Unique transaction ID for the cell. **Required.** |
+| **`status`** | `Enum` | `NEW`, `PENDING`, `MATCHED`, `AMBIGUOUS`. |
+| **`consensus_score`** | `Float` | Final confidence (0.0 - 1.0). Null if status is `NEW`. |
+| **`candidates`** | `Array` | List of candidate objects. |
+| **`vector_ref`** | `String` | Pointer to the heavy vector payload in DuckDB. |
+
+### 2. Candidate Object Structure
+Used inside the `candidates` array.
+
+| JSON Key | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `String` | Wikidata QID (Regex: `^Q[0-9]+$`). |
+| `label` | `String` | The entity label. |
+| `features.tapioca_popularity` | `Float` | Raw Solr score. |
+| `features.falcon_context` | `Float` | Semantic vector score. |
+
+---
+
+## 3. Feedback Correction Contract
+**Schema Source:** `schemas/data/feedback_correction.json`
+
+Used for the "Learning Loop".
+
+| JSON Key | Description |
+| :--- | :--- |
+| `original_input` | The raw text user tried to reconcile. |
+| `rejected_candidate` | The candidate the AI selected (and User rejected). |
+| `accepted_candidate` | The candidate the User manually selected. |
+| `user_comment` | Optional context provided by the user. |
+
+```
+
+---
+
+###**3. Implementation Note for Developers**To upgrade an existing environment to this new spec:
+
+1. **Stop all services.**
+2. **Clean:** Delete the `python_venv/` folder and the `solr/` root folder (keep `server/solr/`).
+3. **Install:** Run `pip install -r src/requirements.txt`.
+4. **Verify:** Check that `config/orchestration/environment.json` matches the "Golden Variables" listed above.
+5. **Rebuild:** Run `./refine build` (Java) and `npm install` (Frontend).
+
+
