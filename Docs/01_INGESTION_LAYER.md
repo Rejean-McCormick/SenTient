@@ -43,6 +43,8 @@ We do not use standard Lucene text search (TF-IDF). We use the **Solr TaggerHand
 * **Operation:** The raw text acts as a cursor traversing the FST graph.
 * **Performance:** Lookup time is $O(k)$ where $k$ is the length of the input text, independent of the index size.
 
+
+
 ### Phase C: The Authority Filter (Pruning)
 Solr returns candidates. We immediately discard any candidate that:
 1.  Has a `popularity_score` < 100 (log-likelihood threshold).

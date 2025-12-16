@@ -10,8 +10,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * The Reconciliation State Object (SenTient Edition).
- * * Extends the OpenRefine 'Recon' model to support the Hybrid Memory Architecture.
- * * Key Change: Heavy data (vectors, candidates) is marked 'transient' and is
+ * Role: Extends the OpenRefine 'Recon' model to support the Hybrid Memory Architecture.
+ * Key Change: Heavy data (vectors, candidates) is marked 'transient' and is
  * NOT stored in the Project History JSON. It is hydrated on-demand from DuckDB.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -27,7 +27,7 @@ public class Recon implements Serializable {
         @JsonProperty("none") None,
         @JsonProperty("matched") Matched,
         @JsonProperty("new") New,
-        @JsonProperty("ambiguous") Ambiguous // Added for SenTient
+        @JsonProperty("ambiguous") Ambiguous // Added for SenTient "Review Needed" flow
     }
 
     /**
@@ -83,17 +83,18 @@ public class Recon implements Serializable {
 
     /**
      * The final calculated confidence (0.0 - 1.0).
-     * Used for the "Confidence Bar" visualization.
+     * Used for the "Confidence Bar" visualization in the UI.
      */
     @JsonIgnore
     public transient float consensusScore;
 
     /**
-     * Debugging telemetry.
+     * Debugging telemetry / Feature Vector.
      * Contains { "tapioca_popularity": 0.9, "falcon_context": 0.2, ... }
+     * [ALIGNMENT] Named 'features' to match SenTientOrchestrator and DuckDBStore.
      */
     @JsonIgnore
-    public transient Map<String, Double> featureVector;
+    public transient Map<String, Double> features;
 
     // =========================================================================
     // 3. Constructors & Logic
@@ -115,6 +116,9 @@ public class Recon implements Serializable {
         this.matchRank = candidate.score;
     }
 
+    /**
+     * Helper to retrieve the highest scoring candidate (usually index 0).
+     */
     public ReconCandidate getBestCandidate() {
         if (candidates != null && !candidates.isEmpty()) {
             return candidates.get(0);

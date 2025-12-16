@@ -1,11 +1,11 @@
 # ==============================================================================
 # SenTient Extended Stopwords (Falcon Layer)
 # ==============================================================================
-# This list is used by 'src/falcon/preprocessing.py' to clean input text
+# This list is used by 'src/falcon/preprocessing.py' to clean input text 
 # before generating N-Grams or Context Vectors.
 #
 # Strategy: Aggressive Pruning.
-# We remove not just grammatical glue (the, is, at) but also
+# We remove not just grammatical glue (the, is, at) but also 
 # structural noise common in data dumps (http, www, null).
 # ==============================================================================
 

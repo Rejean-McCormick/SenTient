@@ -88,7 +88,7 @@
         "dims": 768,
         "index": true,
         "similarity": "cosine",
-        "meta": { "description": "BERT/SBERT embedding of the property label+description for semantic context matching." }
+        "meta": { "description": "BERT/SBERT embedding of the property label+description for semantic context matching. Matches all-MiniLM-L6-v2 dimensions." }
       },
       "expected_types": {
         "type": "keyword",

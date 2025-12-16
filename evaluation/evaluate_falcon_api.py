@@ -20,7 +20,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger("evaluate_falcon")
 
 # Constants
-API_ENDPOINT = "http://localhost:5005/api/v1/disambiguate"
+# [ALIGNMENT] Use 127.0.0.1 to match system-wide Golden Variables
+API_ENDPOINT = "http://127.0.0.1:5005/api/v1/disambiguate"
 DEFAULT_DATASET = "datasets/lcquad2_test.json"
 DEFAULT_OUTPUT = "results/benchmark_results.csv"
 
@@ -39,10 +40,8 @@ def load_dataset(filepath):
                 # Normalize LC-QuAD 2.0 structure
                 for item in raw_data:
                     # Extract necessary fields. Adjust keys based on specific JSON schema.
-                    # Assuming LC-QuAD structure: { "question": "...", "uid": "..." }
-                    # For this benchmark, we need structured entities. 
-                    # If using a custom test set: { "surface_form": "Paris", "context": [...], "expected_id": "Q90" }
-                    if 'expected_id' in item:
+                    # Required schema: { "surface_form": "Paris", "context": [...], "candidates": ["Q90", ...], "expected_id": "Q90" }
+                    if 'expected_id' in item and 'candidates' in item:
                         data.append(item)
         else:
             # Assume TSV: subject_qid \t property_pid \t object_qid \t question
@@ -51,20 +50,21 @@ def load_dataset(filepath):
                 for row in reader:
                     if len(row) >= 4:
                         # Synthetic test generation from SimpleQuestions
-                        # We use the subject label (if we had it) as surface form.
-                        # Since TSV lacks labels, this mode requires a hydrated dataset.
+                        # Note: This requires a separate hydration step to fetch Labels/Candidates via Solr
                         pass 
     except Exception as e:
         logger.error(f"Failed to load dataset: {e}")
         exit(1)
         
-    logger.info(f"Loaded {len(data)} test cases.")
+    logger.info(f"Loaded {len(data)} valid test cases.")
     return data
 
 def evaluate_api(dataset, limit=None):
     """
     Runs the benchmark loop.
     """
+    
+
     if limit:
         dataset = dataset[:limit]
 
@@ -80,17 +80,18 @@ def evaluate_api(dataset, limit=None):
         surface_form = case.get('surface_form')
         context = case.get('context', [])
         expected_id = case.get('expected_id')
-        # In a real scenario, we might simulate candidates from Solr
+        # Falcon REQUIREs candidates to rank. In benchmark mode, these must be pre-populated
+        # or fetched from Solr in a pre-processing step.
         candidates = case.get('candidates', []) 
 
-        if not surface_form or not expected_id:
+        if not surface_form or not expected_id or not candidates:
             continue
 
         payload = {
             "surface_form": surface_form,
             "context_window": context,
             "candidates": candidates,
-            "limit": 3
+            "limit": 5
         }
 
         try:
@@ -149,11 +150,12 @@ def save_report(results, latencies, correct, total, output_path):
     print("="*40 + "\n")
 
     # Write CSV
-    keys = results[0].keys() if results else []
-    with open(output_path, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
-        writer.writerows(results)
+    if results:
+        keys = results[0].keys()
+        with open(output_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(results)
     
     logger.info(f"Detailed report saved to {output_path}")
 

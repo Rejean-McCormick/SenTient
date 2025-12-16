@@ -2,7 +2,6 @@ package org.openrefine.wikibase.qa;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.openrefine.wikibase.schema.WikibaseSchema;
 import org.openrefine.wikibase.updates.ItemUpdate;
@@ -14,12 +13,12 @@ import com.google.refine.model.Project;
 
 /**
  * The QA Orchestrator (The Scrutinizer Gate).
- * * Role: Drives the Quality Assurance process by executing all registered Scrutinizers.
- * * Architecture:
+ * Role: Drives the Quality Assurance process by executing all registered Scrutinizers.
+ * Architecture:
  * 1. Simulates the export (generates ItemUpdates).
  * 2. Passes updates to IntegrityScrutinizer and ConstraintScrutinizer.
  * 3. Aggregates QAWarning objects for the UI.
- * * Triggered by: SenTientOrchestrator before commit or export.
+ * Triggered by: SenTientOrchestrator before commit or export.
  */
 public class SchemaValidator {
 
@@ -29,20 +28,20 @@ public class SchemaValidator {
         this.scrutinizers = new ArrayList<>();
         
         // 1. Register Core SenTient Scrutinizers
-        [cite_start]// These enforce the rules defined in 'config/qa/scrutinizer_rules.yaml' [cite: 270]
+        // These enforce the rules defined in 'config/qa/scrutinizer_rules.yaml'
         
-        [cite_start]// Checks for Missing Identity, Invalid Formats, P-Tag Confusion [cite: 272]
+        // Checks for Missing Identity, Invalid Formats, P-Tag Confusion
         this.scrutinizers.add(new IntegrityScrutinizer());
         
-        [cite_start]// Checks for Date Validity, Chronology, Cardinality [cite: 280]
+        // Checks for Date Validity, Chronology, Cardinality
         this.scrutinizers.add(new ConstraintScrutinizer());
         
-        [cite_start]// Future: Add ConsensusScrutinizer here for "Popularity vs Context" checks [cite: 275]
+        // Future: Add ConsensusScrutinizer here for "Popularity vs Context" checks
     }
 
     /**
      * Main Entry Point: Validates the current schema mapping against the project data.
-     * * @param project The OpenRefine project containing the data rows.
+     * @param project The OpenRefine project containing the data rows.
      * @param schema The WikibaseSchema defining the mapping graph.
      * @param engine The filtering engine (to validate only active rows).
      * @return A list of aggregated QAWarning objects.
@@ -91,7 +90,7 @@ public class SchemaValidator {
     
     /**
      * Validates if a specific action (Export/Commit) should be blocked.
-     * [cite_start]Based on 'strict_mode' config in scrutinizer_rules.yaml[cite: 271].
+     * Based on 'strict_mode' config in scrutinizer_rules.yaml.
      */
     public boolean containsFatalErrors(List<QAWarning> warnings) {
         return warnings.stream()

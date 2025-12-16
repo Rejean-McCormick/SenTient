@@ -1,0 +1,28 @@
+# ==============================================================================
+# SenTient Falcon Layer - Dependency Lockfile
+# ==============================================================================
+# Usage: pip install -r src/requirements.txt
+# Role:  Ensures deterministic builds for the NLP container.
+# ==============================================================================
+
+# --- Core Framework ---
+Flask==3.0.0            # REST API framework for Port 5005
+gunicorn==21.2.0        # Production WSGI server
+requests==2.31.0        # For internal IPC calls to Solr/Java
+
+# --- NLP & Vectors (CPU Optimized) ---
+# Note: We use the CPU-only wheels for PyTorch to reduce image size by ~700MB.
+# If GPU support is needed later, remove the --index-url line.
+torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers==2.2.2  # Wrapper for SBERT (all-MiniLM-L6-v2)
+numpy==1.26.0           # Matrix operations for vector math
+scikit-learn==1.3.2     # For additional clustering logic
+scipy==1.11.3           # Sparse matrices for PageRank calculations
+
+# --- Data Stores ---
+elasticsearch==8.11.0   # Client for Context Store (Port 9200)
+redis==5.0.1            # Client for Result Cache (Port 6379)
+
+# --- Contracts & Config ---
+PyYAML==6.0.1           # For parsing config/nlp/falcon_settings.yaml
+jsonschema==4.20.0      # MANDATORY: Validates input against schemas/data/smart_cell.json

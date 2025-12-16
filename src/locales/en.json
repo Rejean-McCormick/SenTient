@@ -1,0 +1,31 @@
+{
+  "app": {
+    "title": "SenTient",
+    "subtitle": "Semantic Entity Intelligent Transformation",
+    "version": "1.0.0-RC3"
+  },
+  "grid": {
+    "columns": {
+      "id": "ID",
+      "value": "Original Value",
+      "recon": "Reconciliation Status",
+      "score": "Confidence"
+    },
+    "status": {
+      "new": "New",
+      "pending": "Processing...",
+      "matched": "Matched",
+      "ambiguous": "Ambiguous",
+      "review_required": "Review Needed"
+    },
+    "actions": {
+      "reconcile": "Reconcile Column",
+      "edit": "Edit Cell",
+      "clear": "Clear Match"
+    }
+  },
+  "reconcile": {
+    "dialog": {
+      "title": "Reconcile with Knowledge Graph",
+      "service_label": "Reconciliation Service",
+      "mode_label

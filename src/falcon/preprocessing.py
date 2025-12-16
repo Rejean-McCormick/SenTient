@@ -64,6 +64,7 @@ class FalconPreprocessor:
         The Core Compression Logic.
         Takes a raw list of context words and returns a pruned, densified list.
         
+        
         Example: 
         Input:  ["The", "Hilton", "hotel", "is", "expensive", "."]
         Output: ["Hilton", "hotel", "expensive"]
@@ -81,11 +82,7 @@ class FalconPreprocessor:
             # 3. Filter
             # Must not be empty and must not be a stopword
             if token_clean and token_clean not in self.stopwords:
-                # We preserve the original casing? No, SBERT handles lowercase fine 
-                # and our stopwords are lower. For consistency, we return lower.
-                # However, if we want to preserve Proper Nouns for SBERT, we might want original.
-                # But 'token_clean' is lowercased. 
-                # Strategy: If the cleaned lower version is valid, return the cleaned lower version.
+                # We return the lowercased, cleaned version for consistency with SBERT
                 cleaned_tokens.append(token_clean)
                 
         return cleaned_tokens

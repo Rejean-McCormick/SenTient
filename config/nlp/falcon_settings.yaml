@@ -5,13 +5,14 @@
 # ==============================================================================
 
 server:
-  host: "127.0.0.1" # [SECURITY] Bind strictly to localhost (Docs/05_WIRING.md)
+  host: "127.0.0.1" # [SECURITY] Bind strictly to 127.0.0.1
   port: 5005
   workers: 4  # Number of Gunicorn workers for parallel processing
   timeout: 120 # Seconds before killing a long-running NLP task
 
 elasticsearch:
-  hosts: ["http://localhost:9200"]
+  # [ALIGNMENT] Use 127.0.0.1 to match Golden Variables
+  hosts: ["http://127.0.0.1:9200"]
   # Index names must match config/elastic/falcon_mapping.json
   indexes:
     properties: "sentient_properties_v1"
@@ -91,5 +92,6 @@ thresholds:
 cache:
   enabled: true
   backend: "redis" # or "memory" for dev
-  redis_url: "redis://localhost:6379/0"
+  # [ALIGNMENT] Use 127.0.0.1 to match Golden Variables
+  redis_url: "redis://127.0.0.1:6379/0"
   ttl_seconds: 86400 # 24 Hours

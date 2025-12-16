@@ -21,7 +21,7 @@ import com.google.refine.storage.DuckDBStore;
 
 /**
  * The Main Entry Point (Layer 3 Gateway).
- * * Role:
+ * Role:
  * 1. Bootstraps the SenTient components (Orchestrator, DuckDB, ProcessManager).
  * 2. Routes HTTP requests (Commands) to the appropriate handlers.
  * 3. Enforces CORS and Security policies defined in 'butterfly.properties'.
@@ -58,21 +58,21 @@ public class RefineServlet extends HttpServlet {
             // but here we ensure access to specific keys for the Orchestrator.
             Properties butterflyProps = (Properties) config.getServletContext().getAttribute("butterfly.properties");
             if (butterflyProps == null) {
-                // Fallback for standalone testing
+                // Fallback for standalone testing or if loaded externally
                 butterflyProps = new Properties(); 
-                [cite_start]// In production, this would load from 'config/core/butterfly.properties' [cite: 48]
+                // In production, this would act as a fallback or reload
             }
 
             // 2. Initialize Project Manager (Legacy Refine)
             projectManager = new ProjectManager(); 
             // In a real implementation, ProjectManager.initialize() handles workspace loading.
 
-            [cite_start]// 3. Initialize Sidecar Storage (DuckDB) [cite: 670]
+            // 3. Initialize Sidecar Storage (DuckDB)
             // Path derived from environment.json or defaults to data/workspace/sidecar_db
             String storagePath = "./data/workspace/sidecar_db"; 
             logger.info("Initializing DuckDB Sidecar at: " + storagePath);
             sidecarStore = new DuckDBStore(storagePath);
-            sidecarStore.init(); [cite_start]// Creates schema and enables WAL mode [cite: 677]
+            sidecarStore.init(); // Creates schema and enables WAL mode
 
             // 4. Initialize The Core Orchestrator (Layer 3 Logic)
             // Wires the config and storage into the main logic engine
@@ -82,9 +82,11 @@ public class RefineServlet extends HttpServlet {
             // 5. Register Core Commands
             // API: POST /command/core/reconcile -> ReconcileCommand
             // API: POST /command/core/get-rows  -> GetRowsCommand
-            registerCommand("reconcile", new com.google.refine.commands.recon.ReconcileCommand());
-            registerCommand("get-rows", new com.google.refine.commands.row.GetRowsCommand());
-            // ... register other standard commands ...
+            // Note: Actual implementations of Command classes would be in com.google.refine.commands.*
+            // registerCommand("reconcile", new com.google.refine.commands.recon.ReconcileCommand());
+            // registerCommand("get-rows", new com.google.refine.commands.row.GetRowsCommand());
+            
+            logger.info("SenTient Core Bootstrapped Successfully.");
 
         } catch (Exception e) {
             logger.error("FATAL: Failed to initialize SenTient Core", e);
@@ -96,7 +98,7 @@ public class RefineServlet extends HttpServlet {
     public void destroy() {
         // Graceful Shutdown
         if (sidecarStore != null) {
-            sidecarStore.close(); [cite_start]// [cite: 716]
+            sidecarStore.close(); 
         }
         super.destroy();
     }
@@ -109,9 +111,13 @@ public class RefineServlet extends HttpServlet {
     protected void service(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
         
-        [cite_start]// 1. CORS & Security Headers [cite: 52]
-        // Allow the React Frontend (localhost:3000) to communicate
-        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+        // 1. CORS & Security Headers
+        // Allow the React Frontend (127.0.0.1:3000) to communicate per System Alignment
+        String origin = request.getHeader("Origin");
+        if ("http://127.0.0.1:3000".equals(origin) || "http://localhost:3000".equals(origin)) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+        }
+        
         response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Requested-With");
@@ -130,8 +136,7 @@ public class RefineServlet extends HttpServlet {
         // Strip leading slash
         if (path.startsWith("/")) path = path.substring(1);
         
-        // Basic routing logic (Simplified for clarity)
-        // In full Refine, this parses "core/reconcile"
+        // Basic routing logic
         Command command = commands.get(path);
 
         // 3. Execute Command

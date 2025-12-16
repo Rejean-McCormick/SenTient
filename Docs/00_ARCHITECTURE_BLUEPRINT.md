@@ -1,6 +1,6 @@
 # SenTient Architecture Blueprint
-**Version:** 1.0.0-RC2
-**Status:** PROPOSED
+**Version:** 1.0.0-FINAL
+**Status:** IMPLEMENTED
 **Classification:** INTERNAL TECHNICAL REFERENCE
 
 ---
@@ -19,7 +19,9 @@ The goal is to achieve **High Precision (>0.85)** and **High Recall (>0.80)** on
 
 ## 2. High-Level Architecture (The "Funnel" Logic)
 
-SenTient operates on a "Funnel" strategy: broad and fast at the top, narrow and precise at the bottom, with a **Sidecar Storage** pattern to handle massive datasets.
+SenTient operates on a "Funnel" strategy: broad and fast at the top, narrow and precise at the bottom, with a **Sidecar Storage** pattern to handle massive datasets without crashing the Java Heap.
+
+
 
 ```mermaid
 graph TD

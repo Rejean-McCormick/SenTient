@@ -20,7 +20,7 @@ class FalconPipeline:
 
     def __init__(self, config, embedder, es_client):
         """
-        [cite_start]:param config: Dict loaded from falcon_settings.yaml [cite: 27]
+        :param config: Dict loaded from falcon_settings.yaml
         :param embedder: Loaded SentenceTransformer model (Singleton).
         :param es_client: Connected Elasticsearch client (Singleton).
         """
@@ -44,21 +44,23 @@ class FalconPipeline:
         :param candidate_ids: List of QIDs to rank (e.g., ["Q90", "Q167646"]).
         :return: Dict containing 'inferred_property' and 'ranked_candidates'.
         """
+        # 
+
         # ======================================================================
-        # [cite_start]PHASE A: COMPRESSION (Preprocessing) [cite: 382]
+        # PHASE A: COMPRESSION (Preprocessing)
         # ======================================================================
         # Clean noise to increase vector density
         clean_context_tokens = self.preprocessor.clean_context_window(raw_context)
         context_str = " ".join(clean_context_tokens)
 
         # ======================================================================
-        # [cite_start]PHASE B: EDGE DETECTION (Property Extraction) [cite: 386]
+        # PHASE B: EDGE DETECTION (Property Extraction)
         # ======================================================================
         # Check if the context implies a specific relationship (e.g., "buried in" -> P119)
         inferred_pid = self._infer_property_from_ngrams(clean_context_tokens)
 
         # ======================================================================
-        # [cite_start]PHASE C: VECTOR SCORING (SBERT) [cite: 389]
+        # PHASE C: VECTOR SCORING (SBERT)
         # ======================================================================
         if not candidate_ids:
             return {"inferred_property": inferred_pid, "ranked_candidates": []}
@@ -82,7 +84,7 @@ class FalconPipeline:
             text_to_encode = desc if desc else surface_form
             vector_b = self.embedder.encode(text_to_encode, convert_to_tensor=True)
 
-            # [cite_start]Cosine Similarity [cite: 393]
+            # Cosine Similarity
             score = util.cos_sim(vector_a, vector_b).item()
             
             # Clamp to [0, 1]
@@ -129,7 +131,7 @@ class FalconPipeline:
         try:
             res = self.es_client.search(index=self.prop_index, body=query_body)
             if res['hits']['hits']:
-                # [cite_start]Return the PID (e.g., P31) [cite: 387]
+                # Return the PID (e.g., P31)
                 return res['hits']['hits'][0]['_source'].get('pid')
         except Exception as e:
             logger.warning(f"Property inference failed: {e}")
@@ -138,7 +140,7 @@ class FalconPipeline:
 
     def _fetch_descriptions(self, qids):
         """
-        [cite_start]Batch fetch descriptions from 'sentient_entities_fallback'[cite: 402].
+        Batch fetch descriptions from 'sentient_entities_fallback'.
         """
         try:
             response = self.es_client.mget(index=self.ent_index, body={"ids": qids})

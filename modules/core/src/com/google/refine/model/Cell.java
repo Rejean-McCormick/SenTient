@@ -8,10 +8,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * The Atomic Unit of Data in SenTient (Layer 3).
- * * Represents the "SmartCell" artifact. unlike standard OpenRefine cells,
+ * Role: Represents the "SmartCell" artifact. Unlike standard OpenRefine cells,
  * SenTient cells carry a unique UUID and a structural fingerprint to enable
  * distributed reconciliation across the Hybrid Architecture.
- * * Schema: schemas/data/smart_cell.json
+ * Schema: schemas/data/smart_cell.json
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Cell implements Serializable {
@@ -25,7 +25,8 @@ public class Cell implements Serializable {
     /**
      * The raw value of the cell.
      * Can be String, Number, Boolean, or OffsetDateTime.
-     * Corresponds to 'raw_value' in the Data Dictionary.
+     * Maps to 'raw_value' in the logical Data Dictionary, but serialized as 'v' 
+     * to maintain compatibility with legacy OpenRefine GREL expressions.
      */
     @JsonProperty("v")
     public Serializable value;
@@ -33,6 +34,7 @@ public class Cell implements Serializable {
     /**
      * The reconciliation state container.
      * If null, the cell is in the 'NEW' state.
+     * Serialized as 'r'.
      */
     @JsonProperty("r")
     public Recon recon;
@@ -70,6 +72,7 @@ public class Cell implements Serializable {
 
     /**
      * JSON Creator for deserialization from the Frontend or History storage.
+     * Allows restoring the exact UUID and Fingerprint from disk/network.
      */
     @JsonCreator
     public Cell(

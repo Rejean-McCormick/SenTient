@@ -23,7 +23,8 @@ logging.basicConfig(
 logger = logging.getLogger("nlp_falcon")
 
 # Resolve Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # Root of project
+# BASE_DIR is the Project Root (assuming src/main.py)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) 
 SETTINGS_PATH = os.path.join(BASE_DIR, "config", "nlp", "falcon_settings.yaml")
 
 # Load Configuration
@@ -43,13 +44,15 @@ app = Flask(__name__)
 # ==============================================================================
 
 # A. Sentence-BERT Model
-# Loaded into memory once on startup.
+# Loaded into memory once on startup to handle the vector math.
+# Configured in falcon_settings.yaml (default: all-MiniLM-L6-v2)
 logger.info(f"Loading Embedding Model: {config['embeddings']['model_name']}...")
 model_device = config['embeddings']['device']
 embedder = SentenceTransformer(config['embeddings']['model_name'], device=model_device)
 logger.info("Model loaded successfully.")
 
 # B. ElasticSearch Connection
+# Used for Context Property lookups and Candidate Description fetching.
 es_hosts = config['elasticsearch']['hosts']
 es_client = Elasticsearch(
     hosts=es_hosts,
@@ -58,6 +61,7 @@ es_client = Elasticsearch(
 )
 
 # C. Stopwords List
+# Critical for the "Compression" phase of the pipeline.
 stopwords = set()
 stopwords_rel_path = config['preprocessing']['stopwords_file']
 STOPWORDS_PATH = os.path.join(BASE_DIR, stopwords_rel_path)
@@ -78,6 +82,7 @@ except FileNotFoundError:
 
 def preprocess_context(context_tokens):
     """
+    Pipeline Phase A: Compression
     Cleans the context window by removing stopwords defined in falcon_extended_en.txt.
     This increases the density of semantic signals (e.g., keeping "Mayor", "Paris" vs "The", "of").
     """
@@ -113,6 +118,7 @@ def fetch_candidate_descriptions(candidate_ids):
 
 def extract_inferred_property(context_tokens):
     """
+    Pipeline Phase B: Edge Detection
     Scans the context N-Grams against 'sentient_properties_v1' to find predicates.
     e.g., "buried in" -> P119. This allows Falcon to boost 'Location' entities over 'People'.
     """
@@ -171,6 +177,8 @@ def disambiguate():
     Receives: Surface form, Context Window, Candidate QIDs.
     Returns: Ranked Candidates with Semantic Scores.
     """
+    
+
     try:
         payload = request.get_json()
         if not payload:
@@ -252,6 +260,7 @@ def disambiguate():
 # ==============================================================================
 if __name__ == '__main__':
     # Configuration is loaded from falcon_settings.yaml
+    # [ALIGNMENT] strictly binds to 127.0.0.1 per golden variables
     host = config['server']['host']
     port = config['server']['port']
     

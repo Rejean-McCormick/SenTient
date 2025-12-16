@@ -1,0 +1,125 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # ============================================================================
+  # LAYER 1: The Fast Tagger (Solr)
+  # Port: 8983
+  # Role: FST Entity Spotting
+  # ============================================================================
+  solr:
+    image: solr:9.4
+    container_name: sentient_solr
+    ports:
+      - "127.0.0.1:8983:8983" # Bound to localhost per Golden Variables
+    volumes:
+      # Mount the Canonical Core Definition we standardized
+      - ./server/solr/sentient-tapioca:/var/solr/data/sentient-tapioca
+      # Persist the actual index data
+      - solr_data:/var/solr/data
+    command: solr-precreate sentient-tapioca /var/solr/data/sentient-tapioca
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8983/solr/admin/cores?action=STATUS"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sentient_net
+
+  # ============================================================================
+  # LAYER 2: The Semantic Linguist (Falcon & Support)
+  # Port: 5005 (Falcon), 9200 (Elastic), 6379 (Redis)
+  # Role: Contextual Vector Analysis
+  # ============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: sentient_elastic
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # Dev/Intranet mode
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sentient_net
+
+  redis:
+    image: redis:7.2
+    container_name: sentient_redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sentient_net
+
+  falcon:
+    build:
+      context: .
+      dockerfile: Dockerfile.falcon # We will create this next
+    container_name: sentient_falcon
+    ports:
+      - "127.0.0.1:5005:5005"
+    environment:
+      - FLASK_ENV=production
+      - FALCON_WORKERS=4
+      # Internal Docker DNS overrides localhost
+      - ELASTIC_HOST=elasticsearch 
+      - REDIS_HOST=redis
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./models:/app/models
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - sentient_net
+
+  # ============================================================================
+  # LAYER 3: The Orchestrator (Java Core)
+  # Port: 3333
+  # Role: State Management & UI
+  # ============================================================================
+  core:
+    image: eclipse-temurin:17-jdk
+    container_name: sentient_core
+    ports:
+      - "127.0.0.1:3333:3333"
+    environment:
+      - REFINE_MEMORY=4096M
+      - REFINE_PORT=3333
+      # Internal Docker DNS overrides
+      - SOLR_HOST=solr
+      - FALCON_HOST=falcon
+    volumes:
+      - .:/app # Mount entire repo for ./refine script access
+      - ./data/workspace:/app/data/workspace # Persist Project Data
+    working_dir: /app
+    command: ./refine
+    depends_on:
+      - solr
+      - falcon
+    networks:
+      - sentient_net
+
+# ==============================================================================
+# PERSISTENCE & NETWORKING
+# ==============================================================================
+volumes:
+  solr_data:
+  elastic_data:
+  redis_data:
+
+networks:
+  sentient_net:
+    driver: bridge

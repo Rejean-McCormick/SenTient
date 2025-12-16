@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import InfiniteLoader from 'react-window-infinite-loader';
 import axios from 'axios';
 import { Box, Typography, CircularProgress, Tooltip } from '@mui/material';
-import { useQueryClient } from '@tanstack/react-query';
-import ConfidenceBar from '../Reconcile/ConfidenceBar'; // Defined in Docs/06 Section 6
+import ConfidenceBar from '../Reconcile/ConfidenceBar'; 
 
 /**
  * VirtualGrid Component
  * =====================
- * Implements the "Virtual Scroll" strategy defined in Docs/06_API_AND_FRONTEND.md.
- * * Logic:
+ * Implements the "Virtual Scroll" strategy.
+ * Logic:
  * 1. Renders a viewport that only contains ~20 DOM nodes.
  * 2. As the user scrolls, 'InfiniteLoader' calculates which indices are visible.
  * 3. Triggers 'loadMoreItems' to fetch specific row batches from Java Core (Layer 3).
@@ -36,6 +35,7 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
     // Reset state when project or filter (engine) changes
     setRows({});
     setRowCount(0);
+    // Initial fetch
     loadMoreItems(0, BATCH_SIZE);
   }, [projectId, engineConfig]);
 
@@ -55,14 +55,14 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
     try {
       const limit = stopIndex - startIndex + 1;
       
-      // API Call: Docs/06 Section 4.1
+      // API Call to Java Core
       const response = await axios.post(
         '/command/core/get-rows', 
         new URLSearchParams({
           project: projectId,
           start: startIndex,
           limit: limit,
-          engine: JSON.stringify(engineConfig) // Serialize current facets
+          engine: JSON.stringify(engineConfig || {}) // Serialize current facets
         }),
         { 
           signal: abortController.current.signal,
@@ -72,8 +72,14 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
 
       const data = response.data;
 
-      if (data.code === 'ok') {
-        setRowCount(data.total); // Update total scrollable height
+      if (data.code === 'ok' || data.rows) { // Handling potential Refine response structure
+        // If total is not provided in some responses, we might need a separate metadata call
+        if (data.total !== undefined) {
+             setRowCount(data.total); 
+        } else if (rowCount === 0) {
+             // Fallback if total isn't sent every time
+             setRowCount(1000); // Placeholder or logic to fetch metadata
+        }
         
         // Merge new rows into state
         setRows(prev => {
@@ -117,9 +123,9 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
     }
 
     // Case B: Render SmartCell
-    // For simplicity in this view, we assume a single reconciled column logic.
-    // In production, this would map across rowData.cells.
-    const primaryCell = rowData.cells[0]; // Assuming first column is the target
+    // For simplicity in this view, we render the first cell.
+    // In a real implementation, we map over `rowData.cells`.
+    const primaryCell = rowData.cells && rowData.cells.length > 0 ? rowData.cells[0] : { v: "" };
     
     return (
       <div style={style} className={`grid-row ${index % 2 === 0 ? 'even' : 'odd'}`}>
@@ -138,8 +144,8 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
           </Typography>
 
           {/* Column 2: Raw Value */}
-          <Typography variant="body2" sx={{ width: 200, fontWeight: 500 }}>
-            {primaryCell.v}
+          <Typography variant="body2" sx={{ width: 200, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {primaryCell.v !== null ? primaryCell.v.toString() : ""}
           </Typography>
 
           {/* Column 3: Reconciliation Status / Confidence Bar */}
@@ -155,7 +161,7 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
     <Box sx={{ height: '100%', width: '100%', border: '1px solid #ddd' }}>
       <InfiniteLoader
         isItemLoaded={isItemLoaded}
-        itemCount={rowCount}
+        itemCount={rowCount || 1000} // Ensure list has height even if 0 initially
         loadMoreItems={loadMoreItems}
         minimumBatchSize={BATCH_SIZE}
         threshold={10} // Start fetching when 10 rows away from bottom
@@ -163,7 +169,7 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
         {({ onItemsRendered, ref }) => (
           <List
             className="virtual-grid"
-            height={600} // Viewport Height
+            height={600} // Viewport Height - effectively controlled by parent container usually
             itemCount={rowCount}
             itemSize={ROW_HEIGHT}
             onItemsRendered={onItemsRendered}
@@ -183,35 +189,50 @@ const VirtualGrid = ({ projectId, engineConfig }) => {
 // Handles the polymorphic display of the SmartCell state
 // =============================================================================
 const ReconStatus = ({ cell }) => {
-  if (!cell.recon) {
+  // Accessing 'r' (Recon) or 'recon' depending on serialization format
+  // Cell.java uses @JsonProperty("r") but standard Refine might hydrate differently.
+  // We check both for robustness.
+  const recon = cell.r || cell.recon;
+
+  if (!recon) {
     return <Typography variant="caption" color="text.disabled">New</Typography>;
   }
 
   // Case 1: Matched (Show Confidence Bar)
-  if (cell.recon.judgment === 'matched' && cell.recon.match) {
+  // 'm' is the serialized match object in Recon.java
+  const match = recon.m || recon.match;
+  
+  // Check judgment. 'j' is serialized judgment enum.
+  const judgment = recon.j || recon.judgment;
+
+  if (judgment === 'Matched' || judgment === 'matched') {
     return (
       <Box>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
           <Typography variant="body2" sx={{ fontWeight: 'bold', mr: 1, color: '#2e7d32' }}>
-            {cell.recon.match.name}
+            {match ? match.name : "Matched"}
           </Typography>
           <Typography variant="caption" sx={{ color: '#2e7d32', border: '1px solid #2e7d32', borderRadius: 1, px: 0.5 }}>
-            {cell.recon.match.id}
+             {match ? match.id : ""}
           </Typography>
         </Box>
-        {/* The Visualization Component defined in Docs/06 Section 6 */}
-        <ConfidenceBar features={cell.recon.features || cell.recon.match.features} />
+        {/* The Visualization Component: Pass features map.
+            Note: Transient fields like 'features' are loaded via a separate mechanism (DuckDB fetch)
+            or embedded if the Viewport logic hydrated them. Assuming hydrated here. */}
+        <ConfidenceBar features={recon.features || (match ? match.features : null)} />
       </Box>
     );
   }
 
   // Case 2: Ambiguous (Show Candidates)
-  if (cell.recon.candidates && cell.recon.candidates.length > 0) {
+  const candidates = recon.candidates || []; // Transient list, might need separate fetch if empty
+  
+  if (candidates.length > 0) {
     return (
       <Box sx={{ display: 'flex', gap: 1 }}>
         <Typography variant="body2" color="warning.main">Ambiguous:</Typography>
-        {cell.recon.candidates.slice(0, 2).map(c => (
-          <Tooltip key={c.id} title={`Score: ${c.score.toFixed(1)}`}>
+        {candidates.slice(0, 2).map((c, idx) => (
+          <Tooltip key={c.id || idx} title={`Score: ${c.score ? c.score.toFixed(1) : '?'}`}>
              <Typography variant="body2" sx={{ textDecoration: 'underline', cursor: 'pointer' }}>
                {c.name}
              </Typography>

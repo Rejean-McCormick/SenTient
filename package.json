@@ -1,9 +1,12 @@
 {
   "name": "sentient-frontend",
   "private": true,
-  "version": "1.0.0-RC2",
+  "version": "1.0.0-RC3",
   "type": "module",
   "description": "The React-based Frontend for the SenTient Hybrid Reconciliation System.",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite --port 3000",
     "build": "tsc && vite build",
@@ -15,24 +18,22 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    
-    "//_state_management": "TanStack Query handles the Async Polling pattern defined in Docs/06_API_AND_FRONTEND.md",
+    "axios": "^1.6.2",
+    "clsx": "^2.0.0",
+    "lodash": "^4.17.21",
+
     "@tanstack/react-query": "^5.8.4",
-    
-    "//_virtualization": "Mandatory for rendering 10k+ rows without DOM lag (Docs/06 Section 7)",
     "@tanstack/react-virtual": "^3.0.0",
     "react-window": "^1.8.10",
-    
-    "//_ui_components": "Material UI for the heavy lifting, FontAwesome for icons",
+
     "@mui/material": "^5.14.18",
     "@mui/icons-material": "^5.14.18",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
-    
-    "//_utilities": "Axios for API calls, clsx for conditional classes",
-    "axios": "^1.6.2",
-    "clsx": "^2.0.0",
-    "lodash": "^4.17.21"
+
+    "i18next": "^23.7.6",
+    "react-i18next": "^13.5.0",
+    "i18next-http-backend": "^2.4.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
@@ -41,19 +42,17 @@
     "@types/lodash": "^4.14.202",
     "@types/react-window": "^1.8.8",
     
-    "//_build_tooling": "Vite for HMR, TypeScript for type safety (aligned with SmartCell protocol)",
     "@vitejs/plugin-react": "^4.2.0",
     "typescript": "^5.2.2",
     "vite": "^5.0.0",
     
-    "//_testing": "Vitest for unit tests, Cypress for E2E",
     "vitest": "^1.0.0",
     "cypress": "^13.6.0",
     "eslint": "^8.53.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4"
   },
-  "proxy": "http://localhost:3333",
+  "proxy": "http://127.0.0.1:3333",
   "browserslist": {
     "production": [
       ">0.2%",

@@ -3,19 +3,25 @@ package com.google.refine.storage;
 import java.sql.*;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.UUID;
 import org.json.JSONObject;
 import org.json.JSONArray;
 import com.google.refine.model.Cell;
 import com.google.refine.model.Recon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The Sidecar Database Adapter.
- * * Implements the "Hybrid Memory Architecture" pattern:
+ * Role: Implements the "Hybrid Memory Architecture" pattern:
  * - Offloads heavy AI reconciliation data (Vectors, Candidates) to a local Columnar Store (DuckDB).
  * - Prevents Java Heap crashes ("OutOfMemoryError") when processing large datasets (e.g., 5GB CSV).
  * - Provides sub-10ms OLAP aggregation for UI faceting.
  */
 public class DuckDBStore {
+    
+    private static final Logger logger = LoggerFactory.getLogger("DuckDBStore");
+    
     private Connection conn;
     private final String dbPath;
     private static final String TABLE_RECON = "sentient_recon";
@@ -43,6 +49,8 @@ public class DuckDBStore {
 
             // Create Tables (Idempotent)
             createSchema();
+            
+            logger.info("DuckDB Sidecar initialized at: " + this.dbPath);
 
         } catch (ClassNotFoundException e) {
             throw new SQLException("DuckDB Driver not found. Ensure the JAR is on the classpath.", e);
@@ -52,6 +60,7 @@ public class DuckDBStore {
     private void createSchema() throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             // 1. Reconciliation Table (Heavy Storage)
+            // Aligned with config/storage/duckdb_schema.sql
             stmt.execute("CREATE TABLE IF NOT EXISTS " + TABLE_RECON + " (" +
                          "project_id BIGINT NOT NULL, " +
                          "row_index INTEGER NOT NULL, " +
@@ -103,12 +112,12 @@ public class DuckDBStore {
                 pstmt.setInt(2, rowIndex);
                 
                 // Store lightweight metadata for faceting
-                String judgmentStr = (cell.recon.judgment == null) ? "NONE" : cell.recon.judgment.name();
+                String judgmentStr = (cell.recon.judgment == null) ? "None" : cell.recon.judgment.name();
                 pstmt.setString(3, judgmentStr);
                 
-                // Transient field added in SenTient architecture
+                // [ALIGNMENT] Access consensusScore directly from Recon (Standardized with SenTientOrchestrator)
                 // Default to 0.0 if not yet calculated
-                float score = (cell.recon instanceof EnhancedRecon) ? ((EnhancedRecon) cell.recon).consensusScore : 0.0f;
+                float score = (cell.recon.consensusScore > 0) ? cell.recon.consensusScore : 0.0f;
                 pstmt.setFloat(4, score);
 
                 // Serialize the heavy AI data (Candidates, Vectors) to JSON
@@ -116,11 +125,9 @@ public class DuckDBStore {
                 if (cell.recon.candidates != null) {
                     payload.put("candidates", new JSONArray(cell.recon.candidates));
                 }
-                if (cell.recon instanceof EnhancedRecon) {
-                    EnhancedRecon eRecon = (EnhancedRecon) cell.recon;
-                    if (eRecon.featureVector != null) {
-                        payload.put("features", new JSONObject(eRecon.featureVector));
-                    }
+                // [ALIGNMENT] Check featureVector availability
+                if (cell.recon.features != null && !cell.recon.features.isEmpty()) {
+                    payload.put("features", new JSONObject(cell.recon.features));
                 }
                 
                 pstmt.setString(5, payload.toString());
@@ -177,14 +184,15 @@ public class DuckDBStore {
     public void logCorrection(long projectId, String surfaceForm, String rejectedId, String acceptedId, String comment) throws SQLException {
         String sql = "INSERT INTO " + TABLE_FEEDBACK + 
                      " (id, project_id, surface_form, rejected_id, accepted_id, user_comment) " +
-                     "VALUES (uuid(), ?, ?, ?, ?, ?)";
-                     
+                     "VALUES (?, ?, ?, ?, ?, ?)";
+                      
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setLong(1, projectId);
-            pstmt.setString(2, surfaceForm);
-            pstmt.setString(3, rejectedId);
-            pstmt.setString(4, acceptedId);
-            pstmt.setString(5, comment);
+            pstmt.setObject(1, UUID.randomUUID());
+            pstmt.setLong(2, projectId);
+            pstmt.setString(3, surfaceForm);
+            pstmt.setString(4, rejectedId);
+            pstmt.setString(5, acceptedId);
+            pstmt.setString(6, comment);
             pstmt.executeUpdate();
         }
     }
@@ -195,7 +203,7 @@ public class DuckDBStore {
                 conn.close();
             }
         } catch (SQLException e) {
-            // Log warning
+            logger.warn("Error closing DuckDB connection", e);
         }
     }
 }

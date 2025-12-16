@@ -25,6 +25,8 @@ SenTient is a distributed system running on `localhost`. Strict port discipline 
 
 The Java Core acts as the "Master" node. It communicates with "Worker" nodes via specific protocols defined in `butterfly.properties`.
 
+
+
 ### 2.1. Link A: Java -> Solr (Layer 1)
 * **Purpose:** High-speed entity spotting.
 * **Client:** `org.apache.solr.client.solrj.impl.Http2SolrClient`

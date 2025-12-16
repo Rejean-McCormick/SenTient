@@ -7,7 +7,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
  * ConfidenceBar Component
  * =======================
  * Visualizes the "SenTient Consensus Score" as a stacked bar chart.
- * * Logic defined in Docs/06_API_AND_FRONTEND.md[cite: 496]:
+ * Logic defined in Docs/06_API_AND_FRONTEND.md:
  * - Total Width represents the Final Score (0-100).
  * - Segments represent the contribution of each layer:
  * 1. Blue:   Solr Popularity (Max 40% contribution)
@@ -16,7 +16,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
  */
 
 const ConfidenceBar = ({ features }) => {
-  // Defensive check for missing telemetry
+  // Defensive check for missing telemetry (e.g., pre-computation state)
   if (!features) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.disabled' }}>
@@ -26,12 +26,12 @@ const ConfidenceBar = ({ features }) => {
     );
   }
 
-  // Destructure features (Values are 0.0 - 1.0) [cite: 450, 451]
+  // Destructure features (Values are normalized 0.0 - 1.0 from Java Core)
   const popularity = features.tapioca_popularity || 0;
   const context = features.falcon_context || 0;
   const spelling = features.levenshtein_distance || 0;
 
-  // Calculate segment widths based on weights [cite: 496]
+  // Calculate segment widths based on weights defined in 'environment.json'
   // The bar represents the score percentage (0-100%)
   const widthPop = popularity * 40;   // Max 40%
   const widthCtx = context * 30;      // Max 30%
@@ -39,7 +39,7 @@ const ConfidenceBar = ({ features }) => {
   
   const totalScore = Math.round(widthPop + widthCtx + widthSpell);
 
-  // High Context Indicator [cite: 496]
+  // High Context Indicator
   // "If falcon_context > 0.8, add a 'Star' icon."
   const isContextStar = context > 0.8;
 
@@ -72,7 +72,7 @@ const ConfidenceBar = ({ features }) => {
         <Tooltip title={`Popularity (Solr): ${(popularity * 100).toFixed(0)}%`}>
           <Box sx={{ 
             width: `${widthPop}%`, 
-            [cite_start]bgcolor: '#2196f3', // Blue [cite: 496]
+            bgcolor: '#2196f3', // Blue
             transition: 'width 0.5s ease' 
           }} />
         </Tooltip>
@@ -81,7 +81,7 @@ const ConfidenceBar = ({ features }) => {
         <Tooltip title={`Context (Falcon): ${(context * 100).toFixed(0)}%`}>
           <Box sx={{ 
             width: `${widthCtx}%`, 
-            [cite_start]bgcolor: '#4caf50', // Green [cite: 496]
+            bgcolor: '#4caf50', // Green
             transition: 'width 0.5s ease' 
           }} />
         </Tooltip>
@@ -90,7 +90,7 @@ const ConfidenceBar = ({ features }) => {
         <Tooltip title={`Spelling (Levenshtein): ${(spelling * 100).toFixed(0)}%`}>
           <Box sx={{ 
             width: `${widthSpell}%`, 
-            [cite_start]bgcolor: '#ffeb3b', // Yellow [cite: 497]
+            bgcolor: '#ffeb3b', // Yellow
             transition: 'width 0.5s ease' 
           }} />
         </Tooltip>

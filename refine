@@ -4,6 +4,7 @@
 # SenTient Startup Script (Linux/macOS)
 # ==============================================================================
 # Role: Bootloader for the Java Core Orchestrator (Layer 3).
+# Version: 1.0.0-RC3
 # Usage: ./refine
 # ==============================================================================
 
@@ -14,7 +15,7 @@ SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
   DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
   SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, resolve relative to the path where the symlink file was located
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
@@ -28,12 +29,17 @@ if [ -f "$REFINE_HOME/refine.ini" ]; then
 fi
 
 # Set defaults if refine.ini is missing
+# [ALIGNMENT] Default to 4GB to match 'Hybrid Memory Architecture' specs
 if [ -z "$REFINE_MEMORY" ]; then
-    REFINE_MEMORY="1400M"
+    REFINE_MEMORY="4096M"
 fi
 
+# [ALIGNMENT] Enforce Golden Variables:
+# - UseG1GC: Low pause collection for batch processing
+# - refine.host/port: Strict binding to 127.0.0.1:3333 (Security)
+# - refine.headless: Disable AWT, purely API/Server mode
 if [ -z "$JAVA_OPTIONS" ]; then
-    JAVA_OPTIONS="-XX:+UseG1GC -Drefine.port=3333"
+    JAVA_OPTIONS="-XX:+UseG1GC -Drefine.headless=true -Drefine.host=127.0.0.1 -Drefine.port=3333"
 fi
 
 # 3. Java Environment Check
@@ -53,8 +59,8 @@ echo "SenTient Bootloader: Found Java version $JAVA_VERSION"
 # We must include:
 # - The Servlet Container (Jetty)
 # - The Core Application (Refine)
-# - The New Storage Drivers (DuckDB)
-# - The Extensions (Wikibase, Solr)
+# - The New Storage Drivers (DuckDB Sidecar)
+# - The Extensions (Wikibase, Solr Client)
 
 CP=""
 
@@ -79,7 +85,7 @@ done
 echo "Starting SenTient Core..."
 echo "  Memory:  $REFINE_MEMORY"
 echo "  Home:    $REFINE_HOME"
-echo "  Options: $JAVA_OPTIONS"
+echo "  Binding: 127.0.0.1:3333"
 
 exec "$JAVA" \
     -cp "$CP" \
