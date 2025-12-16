@@ -1,3 +1,4 @@
+// extensions\wikibase\src\org\openrefine\wikibase\qa\SchemaValidator.java
 package org.openrefine.wikibase.qa;
 
 import java.util.ArrayList;

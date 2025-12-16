@@ -27,7 +27,7 @@ class FalconPreprocessor:
 
         # 2. Compile Regex
         # Pre-compile the cleaning regex defined in settings for performance
-        # Default: "[^a-zA-Z0-9\\s]" (Remove punctuation/symbols)
+        # Default: "[^a-zA-Z0-9\s]" (Remove punctuation/symbols)
         regex_pattern = config['preprocessing'].get('clean_regex', "[^a-zA-Z0-9\\s]")
         self.clean_regex = re.compile(regex_pattern)
 

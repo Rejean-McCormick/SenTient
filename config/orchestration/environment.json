@@ -82,6 +82,11 @@
       "checkpoint_interval_rows": 1000
     },
     "scoring": {
+      "weights": {
+        "tapioca_popularity": 0.4,
+        "falcon_context": 0.3,
+        "levenshtein_distance": 0.3
+      },
       "sigmoid_k": 2.0,
       "sigmoid_m": 3.0
     },

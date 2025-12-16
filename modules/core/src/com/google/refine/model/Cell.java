@@ -1,3 +1,4 @@
+// modules\core\src\com\google\refine\model\Cell.java
 package com.google.refine.model;
 
 import java.io.Serializable;
