@@ -1,0 +1,84 @@
+# ==============================================================================
+# SenTient .gitignore
+# ==============================================================================
+
+# --- Operating System Files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*$RECYCLE.BIN/
+
+# --- IDE & Editors ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+*.ipr
+*.iws
+
+# --- Python (Falcon Layer) ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+.pytest_cache/
+*.log
+
+# --- Java (OpenRefine Core) ---
+*.class
+*.jar
+*.war
+*.ear
+target/
+bin/
+.settings/
+.classpath
+.project
+# Ignore compiled classes in the webapp structure (we build these locally)
+webapp/WEB-INF/classes/
+# However, DO NOT ignore the lib folder if you want to commit the binaries
+# webapp/WEB-INF/lib/
+# server/lib/
+
+# --- Node.js / React (Frontend) ---
+node_modules/
+dist/
+build/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Docker & Infrastructure ---
+docker-compose.override.yml
+.docker/
+
+# --- SenTient Data & Runtime ---
+# Ignore actual workspace data (user projects) but keep the folder structure
+data/workspace/*
+!data/workspace/.gitkeep
+
+# Ignore large downloaded AI models (they should be fetched, not committed)
+data/models/*
+!data/models/.gitkeep
+
+# Ignore runtime logs
+logs/*
+!logs/.gitkeep
+
+# Ignore Solr index data if locally mounted (though we use Docker volumes usually)
+server/solr/sentient-tapioca/data/
+
+# --- Temporary / Scratch Files ---
+temp/
+tmp/
+*.tmp
+*.bak
+
+
+
+add_path_header.py
+GitSink.bat
