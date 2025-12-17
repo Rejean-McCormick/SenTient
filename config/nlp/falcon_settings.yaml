@@ -1,18 +1,19 @@
 # ==============================================================================
 # SenTient NLP Configuration (Falcon Layer)
 # ==============================================================================
-# Controls the Semantic Relation Extraction and Contextual Re-ranking service.
+# Role: Controls the Semantic Relation Extraction and Contextual Re-ranking.
+# Status: PRODUCTION (Docker Optimized)
 # ==============================================================================
 
 server:
-  host: "127.0.0.1" # [SECURITY] Bind strictly to 127.0.0.1
+  host: "0.0.0.0"       # [DOCKER] Must bind to all interfaces to be reachable
   port: 5005
-  workers: 4  # Number of Gunicorn workers for parallel processing
-  timeout: 120 # Seconds before killing a long-running NLP task
+  workers: 1            # [CRITICAL] Keep at 1. Multi-worker crashes PyTorch on CPU.
+  timeout: 300          # [PERFORMANCE] Increased to 5 mins for initial Model Load
 
 elasticsearch:
-  # [ALIGNMENT] Use 127.0.0.1 to match Golden Variables
-  hosts: ["http://127.0.0.1:9200"]
+  # [DOCKER NETWORKING] Must point to the container name, not localhost
+  hosts: ["http://sentient_elastic:9200"]
   # Index names must match config/elastic/falcon_mapping.json
   indexes:
     properties: "sentient_properties_v1"
@@ -28,7 +29,6 @@ elasticsearch:
 preprocessing:
   language: "en"
   # Aggressive stopword removal to isolate predicates (e.g., "is buried in" -> "buried")
-  # File path relative to the Python service root
   stopwords_file: "data/stopwords/falcon_extended_en.txt"
   
   # Regex to clean surface forms before N-Gram generation
@@ -40,58 +40,53 @@ preprocessing:
     max_length: 6 
 
 # ==============================================================================
-# 2. EMBEDDING MODEL (The Contextual Vector Logic)
+# 2. EMBEDDING MODEL (The "Brain")
 # ==============================================================================
 embeddings:
-  # Using a lightweight SBERT model for speed/accuracy trade-off
+  # Using a lightweight SBERT model (80MB) for CPU speed/accuracy trade-off
   model_name: "all-MiniLM-L6-v2"
   cache_dir: "./models/cache"
-  device: "cpu" # Set to "cuda" if GPU is available
-  normalize_embeddings: true # Required for Cosine Similarity calculation
+  device: "cpu" # Set to "cuda" only if NVIDIA GPU is present
+  normalize_embeddings: true 
 
 # ==============================================================================
 # 3. RE-RANKING STRATEGIES (The "Hybrid" Logic)
 # ==============================================================================
 ranking:
-  # Strategy 1: Levenshtein Post-Processing (The "Falcon Double-Check")
-  # [CRITICAL UPDATE] Disabled to resolve conflict with Layer 3 (Java Core).
-  # The Architecture Blueprint (02_SEMANTIC_LAYER.md) states that Falcon must
-  # NOT apply string penalties, as the Java Core applies them independently
-  # for the UI visualization.
+  # Strategy 1: Levenshtein Post-Processing
+  # [ARCHITECTURAL DECISION] Disabled. String distance is handled by Layer 3 (Java Core).
   levenshtein:
     enabled: false
     max_distance_threshold: 2  
-    exact_match_boost: 2.0     
+    exact_match_boost: 2.0      
     near_match_penalty: 0.5    
 
-  # Strategy 2: Contextual Similarity (Vector Dot Product)
-  # Used to rank candidates based on the surrounding sentence
+  # Strategy 2: Contextual Similarity
+  # Measures distance between the Sentence Vector and Candidate Vector
   context:
-    window_size: 5  # Number of words left/right of the entity to include in context vector
-    weight: 0.7     # Importance of context vs. lexical match in final score
+    window_size: 5  # Words left/right of entity to capture
+    weight: 0.7     # 70% Context, 30% Lexical match (implicitly)
 
 # ==============================================================================
 # 4. THRESHOLDS (The "Decision" Logic)
 # ==============================================================================
 thresholds:
-  # Minimum combined score to return a candidate at all
+  # Minimum score to even consider a candidate
   min_confidence: 0.35
   
-  # Score above which we consider the entity "Automatically Matched" (Status: MATCHED)
+  # Score above which the UI shows "MATCHED" automatically
   auto_match_cutoff: 0.85
   
-  # Maximum number of candidates to return to the Java Core
-  # [PERFORMANCE UPDATE] Reduced from 5 to 3 to prevent CPU thrashing.
-  # Since we are running SBERT on CPU (see 'embeddings.device'), calculating 
-  # vectors for 5 candidates per row often exceeds the 200ms latency budget.
+  # [PERFORMANCE] Limit to 3 candidates per row to spare CPU cycles.
+  # Calculating vectors for >3 candidates increases latency significantly.
   max_candidates: 3
 
 # ==============================================================================
-# 5. CACHING (The "Cold Cache" Logic)
+# 5. CACHING (The "Speed" Layer)
 # ==============================================================================
 cache:
   enabled: true
-  backend: "redis" # or "memory" for dev
-  # [ALIGNMENT] Use 127.0.0.1 to match Golden Variables
-  redis_url: "redis://127.0.0.1:6379/0"
+  backend: "redis" 
+  # [DOCKER NETWORKING] Must point to the container name
+  redis_url: "redis://sentient_redis:6379/0"
   ttl_seconds: 86400 # 24 Hours

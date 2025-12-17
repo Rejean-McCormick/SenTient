@@ -26,6 +26,22 @@ services:
     networks:
       - sentient_net
 
+# ============================================================================
+  # LAYER 1.5: OpenTapioca (Build from Source)
+  # Port: 8080
+  # ============================================================================
+  opentapioca:
+    build: 
+      context: ./opentapioca
+      dockerfile: Dockerfile
+    container_name: sentient_opentapioca
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      - WIKIDATA_ENDPOINT=https://query.wikidata.org/sparql
+    networks:
+      - sentient_net
+
   # ============================================================================
   # LAYER 2: The Semantic Linguist (Falcon & Support)
   # Port: 5005 (Falcon), 9200 (Elastic), 6379 (Redis)

@@ -1,0 +1,7 @@
+Query,Target_Entity,Expected_ID,OpenTapioca_Result,Falcon_Result
+Apple is a tech giant.,Apple,Q312,[],Q312 (0.6919)
+I ate a red Apple.,Apple,Q89,[],Q312 (0.5339)
+Paris Hilton is famous.,Paris,Q47746,[],Q90 (0.5644)
+I love visiting Paris.,Paris,Q90,[],Q90 (0.7737)
+Amazon is a massive river.,Amazon,Q3783,[],Q3783 (0.5586)
+Amazon delivers packages.,Amazon,Q3884,[],Q3783 (0.483)

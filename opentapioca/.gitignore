@@ -1,0 +1,11 @@
+*.pyc
+*.log
+build/
+dist/
+opentapioca.egg-info/
+.venv/
+.project
+.pydevproject
+.settings/
+configsets/_default/
+settings.py

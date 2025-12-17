@@ -1,0 +1,145 @@
+To do this "Extensively" and "Extremely Well"—moving from a "Science Project" to "Production Engineering"—we need to restructure your codebase to support Observability, Quality Assurance (QA), and Stress Testing.
+
+We are shifting from "fixing bugs" to "proving reliability."
+
+Here is the Master File Inventory required to professionalize the SenTient Falcon stack.
+
+1. The New Directory Structure
+You need to organize your root folder. Loose scripts (benchmark_verbose.py) are for prototyping; folders are for engineering.
+
+Plaintext
+
+C:\MyCode\Sentry\SenTient\
+├── config\                 # Existing configs
+├── src\
+│   ├── main.py             # (Update) Inject Middleware hook
+│   ├── middleware.py       # (New) The Telemetry Recorder
+│   └── requirements.txt    # (Update) Add monitoring libs
+├── tests\                  # (New) The QA Suite
+│   ├── __init__.py
+│   ├── unit\               # Tests logic inside the code (No Docker needed)
+│   │   └── test_vector_math.py
+│   ├── integration\        # Tests the API endpoints (Docker must be running)
+│   │   └── test_api_contracts.py
+│   └── data\               # Test datasets
+│       └── golden_scenarios.json
+├── scripts\                # (New) Operational Tools
+│   ├── monitor.py          # Real-time Terminal Dashboard
+│   └── stress_test.py      # Load Generator
+└── docs\                   # (Update)
+    └── 04_TELEMETRY.md     # Documentation of what we measure
+2. The Detailed File Inventory
+Here is exactly what needs to be created or updated, and why.
+
+Group A: Application Instrumentation (Inside the Container)
+These files ensure the application measures ITSELF.
+
+1. src/middleware.py (New)
+
+Purpose: Keeps main.py clean. This module wraps every request in a "Stopwatch."
+
+What it Captures:
+
+Total Request Duration (ms).
+
+Breakdown: Time spent in Vectorization vs. ElasticSearch vs. Overhead.
+
+Status Codes (200 vs 500).
+
+Input Payload size (bytes).
+
+2. src/main.py (Update)
+
+Purpose: Integrate the middleware.
+
+Change: Import middleware and apply the @monitor_performance decorator to your routes.
+
+Why: Ensures consistency. Every API call generates a uniform log line.
+
+3. src/requirements.txt (Update)
+
+Additions:
+
+psutil (To measure internal CPU/RAM usage from within Python).
+
+python-json-logger (To output logs as JSON, not text, so machines can read them).
+
+Group B: The QA Suite (Testing)
+These files prove correctness before you deploy.
+
+4. tests/data/golden_scenarios.json (New)
+
+Purpose: A "Truth File" containing 50+ test cases (Apple/Fruit, Apple/Tech, Bass/Fish, Bass/Guitar).
+
+Why: Hardcoding tests in Python is bad practice. This JSON file allows non-programmers to add test cases.
+
+5. tests/unit/test_vector_math.py (New)
+
+Purpose: Tests the math without running Docker.
+
+Verification: Does the Cosine Similarity function return 1.0 for identical vectors? Does the Stopword remover actually remove "the"?
+
+Why: Fast feedback. These tests run in 0.1 seconds.
+
+6. tests/integration/test_api_contracts.py (New)
+
+Purpose: Tests the Docker Container.
+
+Verification:
+
+Does /health return 200?
+
+Does /disambiguate return the correct JSON structure?
+
+What happens if I send garbage JSON? (Robustness test).
+
+Group C: Operational Telemetry (Monitoring)
+These files watch the system from the outside.
+
+7. scripts/monitor.py (The Dashboard)
+
+Purpose: A "Control Center" script you run in a second terminal.
+
+What it Monitors:
+
+Docker Stats: Real-time CPU % and RAM usage of the sentient_falcon container.
+
+API Health: Pings the service every 2 seconds to calculate "Uptime."
+
+Throughput: Estimated requests per second.
+
+8. scripts/stress_test.py (The Hammer)
+
+Purpose: Simulates heavy load.
+
+Logic: Spawns 10, 50, or 100 concurrent threads to hammer the API.
+
+Capture:
+
+Saturation Point: At what number of users does the latency spike > 2 seconds?
+
+Crash Point: At what number of users does the container die (OOM)?
+
+Group D: Documentation
+If it isn't written down, it doesn't exist.
+
+9. Docs/04_TELEMETRY_SPECS.md (New)
+
+Content:
+
+Definitions of metrics (e.g., "What is 'Cold Start' latency?").
+
+Thresholds (e.g., "If RAM > 800MB, the system is considered unstable").
+
+Instructions on how to read the logs.
+
+Summary of the Upgrade
+By implementing these files, you move from:
+
+"I ran a script and it seems to work."
+
+To:
+
+"We have a split-state architecture with 99.9% uptime, verified by a suite of 50 integration tests, monitored by real-time telemetry, with a known saturation point of 150 requests/second."
+
+Shall I proceed with creating the src/middleware.py and scripts/monitor.py first?

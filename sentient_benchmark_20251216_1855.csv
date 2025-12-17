@@ -1,0 +1,7 @@
+Query,Target_Entity,Expected_ID,OpenTapioca_Result,Falcon_Result
+Apple is a tech giant.,Apple,Q312,[],"Connection Failed: ('Connection aborted.', RemoteDisconnected('Remote"
+I ate a red Apple.,Apple,Q89,[],"Connection Failed: ('Connection aborted.', RemoteDisconnected('Remote"
+Paris Hilton is famous.,Paris,Q47746,[],"Connection Failed: ('Connection aborted.', RemoteDisconnected('Remote"
+I love visiting Paris.,Paris,Q90,[],"Connection Failed: ('Connection aborted.', RemoteDisconnected('Remote"
+Amazon is a massive river.,Amazon,Q3783,[],"Connection Failed: ('Connection aborted.', RemoteDisconnected('Remote"
+Amazon delivers packages.,Amazon,Q3884,[],"Connection Failed: ('Connection aborted.', RemoteDisconnected('Remote"
