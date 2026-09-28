@@ -21,10 +21,20 @@ Desktop.ini
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+.venv/
 venv/
 env/
 .env
+.env.*
+!.env.example
+!.env.*.example
 .pytest_cache/
+.pytest-tmp/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 *.log
 
 # --- Java (OpenRefine Core) ---
@@ -69,7 +79,7 @@ data/models/*
 logs/*
 !logs/.gitkeep
 
-# Ignore Solr index data if locally mounted (though we use Docker volumes usually)
+# Ignore Solr index data if locally mounted
 server/solr/sentient-tapioca/data/
 
 # --- Temporary / Scratch Files ---
@@ -77,8 +87,12 @@ temp/
 tmp/
 *.tmp
 *.bak
+*.bak-*
+*.bak_*
+*.orig
+*~
 
-
-
+# --- Local helper tooling ---
 add_path_header.py
 GitSink.bat
+/SmartSnap.pyw

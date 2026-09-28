@@ -1,0 +1,17 @@
+# SenTient - SmartSnap ignore
+# Ces fichiers peuvent rester versionnés, mais n'apportent pas assez de valeur
+# dans un snapshot de code pour justifier leur poids/bruit.
+
+.smartignore
+
+# Résultats/diagnostics historiques ou régénérables.
+sentient_benchmark_*.csv
+system_diagnosis_report.txt
+
+# Corpus OpenTapioca volumineux, gardés dans le repo pour entraînement/tests.
+opentapioca/data/*.ttl
+
+# Fixtures binaires/compressées lourdes; les fixtures JSON lisibles restent incluses.
+opentapioca/opentapioca/tests/data/*.bz2
+opentapioca/opentapioca/tests/data/*.npy
+opentapioca/opentapioca/tests/data/*.npz
