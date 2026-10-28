@@ -1,61 +1,53 @@
-# SenTient Architecture Blueprint
-**Version:** 1.0.0-FINAL
-**Status:** IMPLEMENTED
-**Classification:** INTERNAL TECHNICAL REFERENCE
+# SenTient architecture and implementation map
 
----
+**Snapshot reviewed:** October 27, 2026  
+**Declared version:** `1.0.0-RC3` (configuration/package metadata)  
+**Verified status:** Multiple layer implementations are present in source; the integrated system is **not verified complete**.
 
-## 1. Executive Summary
-**SenTient** is a next-generation Entity Reconciliation and Relation Extraction engine. It is designed to bridge the gap between messy, unstructured text and structured Knowledge Graphs (Wikidata/Wikibase).
+## Purpose
 
-It is not a monolithic application but a **Hybrid Orchestration System** that combines three distinct technological lineages into a single pipeline:
-1.  **Speed (Layer 1):** The FST-based rapid tagging of **OpenTapioca** (Solr).
-2.  **Semantics (Layer 2):** The context-aware NLP of **Falcon 2.0** (Python/Elastic).
-3.  **Structure (Layer 3):** The **Hybrid Memory** data modeling of **OpenRefine** (Java + DuckDB).
+SenTient aims to reconcile textual mentions with Wikidata/Wikibase entities while preserving candidate evidence and allowing human review. Its hybrid design combines Solr/OpenTapioca candidate discovery, a Python contextual scorer, Java adjudication, and a DuckDB sidecar.
 
-The goal is to achieve **High Precision (>0.85)** and **High Recall (>0.80)** on short-text queries while maintaining a sub-second response time for user interactivity.
-
----
-
-## 2. High-Level Architecture (The "Funnel" Logic)
-
-SenTient operates on a "Funnel" strategy: broad and fast at the top, narrow and precise at the bottom, with a **Sidecar Storage** pattern to handle massive datasets without crashing the Java Heap.
-
-
+## Intended flow
 
 ```mermaid
-graph TD
-    User[User / Frontend] -->|1. Raw Text Batch| Core(Java Core Orchestrator)
-    User -->|Manual Correction| Feedback[(Correction Log)]
+flowchart TD
+    A[Raw input / OpenRefine cells] --> B[Java orchestrator]
+    B --> C[Solr tagging]
+    C --> D{More than one candidate?}
+    D -->|Yes| E[Python Falcon / Elasticsearch scoring]
+    D -->|No| F[Java weighted consensus]
+    E --> F
+    F --> G[Recon state / best candidate]
+    G --> H[DuckDB sidecar write]
+    H -.-> I[Virtual grid / candidate hydration]
+```
 
-    subgraph "Layer 0: Ingestion & Fingerprinting"
-    Core -->|2. Normalize & Fingerprint| Cache{Local Redis Cache}
-    Cache -->|Hit| Core
-    end
+**Diagram qualification:** this is the intended design, **not a successfully executed trace**. The Java Solr response parser is still a stub, the servlet's application command handlers are not registered, and the UI build is not demonstrated in the snapshot.
 
-    Cache -->|Miss| Layer1
+## Components and evidence
 
-    subgraph "Layer 1: The Sieve (OpenTapioca)"
-    Layer1[Solr FST Tagger]
-    Layer1 -->|3. Spot Surface Forms| Candidates[Raw Candidates]
-    Layer1 -->|4. Inject Popularity Score| Candidates
-    end
+| Layer | Source | Observable behavior | Open issue |
+| --- | --- | --- | --- |
+| Candidate retrieval | `server/solr/`, `opentapioca/`, Java orchestrator | Solr core/config and async request code are present | `parseSolrResponse` returns an empty list; integration not proven |
+| Context scoring | `src/main.py`, `config/nlp/falcon_settings.yaml` | Flask handlers, ES lookups, embedding similarity, ranked JSON | Requires model download/available indexes; no measured service readiness |
+| Consensus | `modules/core/src/com/google/refine/SenTientOrchestrator.java` | Weighted scoring and judgment branches in source | Integration depends on candidate parsing and valid HTTP URLs |
+| Persistence | `modules/core/src/com/google/refine/storage/DuckDBStore.java` | Schema, insert, retrieval and feedback methods exist | No verified Java/DB integration or runtime tests supplied |
+| UI | `src/components/` | Confidence bar and virtual list source files | Missing complete frontend entry/build in snapshot |
+| Contracts | `schemas/` | JSON Schema documents exist | Logical `SmartCell` differs from compact Java `Cell` serialization |
 
-    subgraph "Layer 2: The Linguist (Falcon 2.0)"
-    Candidates -->|5. Context Extraction| NLP[Python NLP Service]
-    NLP -->|6. Fetch Properties| Elastic[(ElasticSearch)]
-    NLP -->|7. Vector Re-ranking| ScoredCandidates
-    end
+## Scoring in Java
 
-    subgraph "Layer 3: The Judge (OpenRefine Core)"
-    ScoredCandidates -->|8. Consensus Scoring| Core
-    Core -->|9. Scrutinizer QA| ValidatedCell
-    end
+`SenTientOrchestrator.java` uses weighted components: Solr popularity **0.40**, Falcon context **0.30**, and Levenshtein score **0.30**. It selects `Matched` for a winning score at least **0.85**, `Ambiguous` for at least **0.40**, and `None` otherwise. These are source-code branches, **not validated accuracy measures**.
 
-    subgraph "Storage Layer (Hybrid Memory)"
-    ValidatedCell -->|10. Offload Heavy Data| DuckDB[(DuckDB Sidecar)]
-    DuckDB -->|11. Return Lightweight Ref| Core
-    end
+The older architectural aspirations of **precision >0.85**, **recall >0.80**, and sub-second performance are goals only; no reproducible evidence accompanies this snapshot. The label `1.0.0-FINAL` previously used in this blueprint was not a verified release status and has been removed.
 
-    Core -->|12. Async Status Update| User
-    User -.->|13. Lazy Fetch (On Scroll)| DuckDB
+## Further reading
+
+- [Ingestion and tagging](01_INGESTION_LAYER.md)
+- [Falcon semantic service](02_SEMANTIC_LAYER.md)
+- [Java core and sidecar](03_CORE_LAYER.md)
+- [Data dictionary](04_DATA_DICTIONARY.md)
+- [Configuration](05_WIRING_AND_CONFIG.md)
+- [API and frontend](06_API_AND_FRONTEND.md)
+- [QA and validation](07_QA_AND_VALIDATION.md)

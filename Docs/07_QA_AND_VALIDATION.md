@@ -1,78 +1,42 @@
-# QA, Validation & Benchmarking
-**Component:** Quality Assurance  
-**Role:** Verification of Accuracy (Precision/Recall) and Performance (Latency).
+# QA, benchmarks, and unresolved integration risks
 
----
+**Snapshot reviewed:** October 27, 2026  
+**Evaluation status:** source inspection only; no full integration, performance, accuracy, or deployment benchmark was run.
 
-## 1. Overview
-In a probabilistic system like SenTient, "It works on my machine" is not enough. We must statistically prove that the system improves over time.
+## Available validation materials
 
-**The QA Strategy relies on 3 Pillars:**
-1.  **Automated Unit Tests:** Checking the code logic (Java/Python).
-2.  **Semantic Scrutinizers:** Checking the data validity (Rules).
-3.  **Golden Standard Benchmarks:** Checking the AI accuracy (Datasets).
+- `evaluation/evaluate_falcon_api.py`: a Python evaluator containing data loading, API evaluation, and CSV reporting logic.
+- `datasets/lcquad2_test.json`, `datasets/simplequestions.txt`, and `datasets/webqsp.test.entities.json`: small bundled dataset samples; **not** proven to contain full canonical benchmark populations.
+- `config/qa/scrutinizer_rules.yaml`: QA rule declarations.
+- `extensions/wikibase/src/org/openrefine/wikibase/qa/`: Java scrubber/scrutinizer classes.
+- `schemas/data/smart_cell.json` and `schemas/api/reconciliation_protocol.json`: intended structural contracts.
+- `opentapioca/opentapioca/tests/`: upstream-style Python tests for included OpenTapioca code; not proof that SenTient's Java/Python stack passes integration.
 
----
+The earlier documentation claimed **5,000+ LC-QuAD questions** in the bundled test file. The supplied `datasets/lcquad2_test.json` is only a few kilobytes, so that volume must not be claimed. Likewise, precision/recall targets and sub-50-ms/sub-second performance are unmeasured goals.
 
-## 2. The Scrutinizers (Runtime Validation)
+## Recommended test gates
 
-Scrutinizers are "Linting Rules for Data". They run automatically in the Java Core *before* any export action.
+1. **Packaging and startup:** verify Compose syntax, build paths, Java build artifacts, Python model loading, and datastore availability.
+2. **Solr contract:** index deterministic fixtures; ensure a live response maps to nonempty `ReconCandidate` records (currently not implemented).
+3. **Falcon API:** test success, empty candidates, invalid payloads, missing ES indexes, and model loading; record versions and environment.
+4. **Orchestration:** register concrete handlers and verify the complete Solr → Falcon → score → store path with controlled input.
+5. **Data model:** compare Java serializer output to JSON Schema and sidecar rehydration; test judgment enum mapping.
+6. **Frontend:** rebuild from a complete entry point, validate request/response shapes, keyboard use, and CORS/CSRF handling.
+7. **Accuracy and latency:** use versioned datasets with documented split, ground truth, precision, recall, F1, per-layer latency distributions, and error analysis.
+8. **Security:** verify service bindings, export permission checks, dependency authentication, and secure configuration before any external deployment.
 
-**Configuration:** `config/qa/scrutinizer_rules.yaml`
+## Known blockers found in this snapshot
 
-### 2.1. Integrity Scrutinizers
-* **Class:** `org.openrefine.wikibase.qa.IntegrityScrutinizer`
-* **Checks:**
-    * Does every `MATCHED` cell have a valid QID (`^Q[0-9]+$`)?
-    * Are there any "Ghost Cells" (Status matched, but ID null)?
-    * **P-Tag Confusion:** Using a Property (P19) where an Item (Q5) is expected.
-* **Action:** Blocks export with `FATAL` error unless Strict Mode is disabled.
+| Area | Evidence | Consequence |
+| --- | --- | --- |
+| Solr → Java | `SenTientOrchestrator.parseSolrResponse` returns an empty list | No real tagger candidates enter the Java scorer |
+| HTTP commands | `RefineServlet` command registrations commented out | `/command/core/reconcile` and `/command/core/get-rows` are not demonstrated |
+| Java configuration | `config/core/butterfly.properties` uses YAML-like syntax without expected Java keys | Layer URL binding is uncertain |
+| Docker build | `Dockerfile.falcon` copies absent `data/models/` | Build can fail before service starts |
+| Frontend | Root Vite/TS files absent from archive | Complete frontend build not verified |
+| Data contract | Java compact `v`/`r`/`fp` vs logical schema fields | Serialization mapping needs explicit testing |
+| Security | Compose disables Elasticsearch security | Not suitable for an exposed or production environment as-is |
 
-### 2.2. Constraint Scrutinizers (Wikidata Alignment)
-* **Class:** `org.openrefine.wikibase.qa.ConstraintScrutinizer`
-* **Checks:**
-    * **Single Value Constraint:** e.g., A country can only have one Capital.
-    * **Format Constraint:** e.g., Dates must be ISO 8601 (`YYYY-MM-DD`).
-    * **Chronology Constraint:** e.g., Death Date cannot precede Birth Date.
-* **Action:** Shows `WARNING` in the UI. User can override.
+## Acceptance criteria
 
-### 2.3. Consensus Scrutinizers (SenTient Exclusive)
-* **Logic:** Checks for statistical anomalies in the scores.
-* **Rule:** "The Paris Hilton Rule"
-    * `IF tapioca_popularity > 0.95 AND falcon_context < 0.1`
-    * **Alert:** "High Popularity but Low Context Similarity. You may have selected a famous entity that does not fit this specific context."
-
-
-
----
-
-## 3. Golden Standard Datasets
-
-We do not guess if the model is good. We measure it against ground truth.
-
-### 3.1. LC-QuAD 2.0 (Large Scale Question Answering)
-* **File:** `datasets/lcquad2_test.json`
-* **Size:** 5000+ Questions.
-* **Use Case:** Validating complex relation extraction.
-* **Metric:** F-Score (Harmonic mean of Precision and Recall).
-
-### 3.2. SimpleQuestions (Wikidata Version)
-* **File:** `datasets/simplequestions.txt`
-* **Format:** `subject_qid \t property_pid \t object_qid \t question`
-* **Use Case:** Validating simple entity spotting speed.
-* **Target:** Latency < 50ms/query.
-
-### 3.3. WebQSP (Web Questions Semantic Parse)
-* **File:** `datasets/webqsp.test.entities.json`
-* **Use Case:** Testing disambiguation of ambiguous surface forms.
-
----
-
-## 4. Benchmarking Scripts
-
-Located in `evaluation/`. These scripts run the full pipeline against the datasets.
-
-### `evaluate_falcon_api.py`
-**Command:**
-```bash
-python evaluation/evaluate_falcon_api.py --dataset datasets/lcquad2_test.json --output results/benchmark_v1.csv --limit 1000
+Do not promote the project to a verified production/`FINAL` status until the above tests pass with recorded evidence. The project metadata label `1.0.0-RC3` is retained as a **declared version**, not an independently verified release qualification.

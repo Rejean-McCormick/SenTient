@@ -1,74 +1,32 @@
-# Layer 1: Ingestion & Fast Tagging (The Sieve)
-**Component:** `index_solr` + `core_java (Clustering)`  
-**Technology:** Apache Solr 9.x (FST Tagger) + Java String Algorithms  
-**Latency Budget:** < 50ms per batch
+# Ingestion and fast entity tagging
 
----
+**Snapshot reviewed:** October 27, 2026  
+**Scope:** Solr/OpenTapioca candidate discovery, not semantic disambiguation.
 
-## 1. Overview
-The **Ingestion Layer** is responsible for the initial intake of raw data and the high-speed identification of "Surface Forms" (substrings that resemble known entities).
+## Design
 
-**Philosophy:** "Fail Fast, Filter Early."
-This layer does not attempt to understand context. Its only job is to reduce the infinite search space of text into a finite list of Candidate QIDs using strict string matching and pre-calculated popularity.
+The proposed fast path identifies matching labels and aliases and passes candidate IDs to the core for further judgment. The repository contains a Solr core (`server/solr/sentient-tapioca/`), a separate OpenTapioca source tree (`opentapioca/`), and a Java request to the Solr tagging endpoint.
 
----
+`SenTientOrchestrator.callLayer1Solr` constructs an HTTP request using `sentient.layer1.solr.url` and appends:
 
-## 2. The Processing Pipeline
+```text
+/tag?overlaps=NO_SUB&tagsLimit=10&fl=id,label,popularity_score,types
+```
 
-Data flows through this layer in three strict phases:
+The code sends the cell's text as `text/plain` and defaults to a **500 ms** per-request timeout from `sentient.layer1.timeout_ms`. An older document specified `tagsLimit=5000`; that is not the value in this Java call.
 
-### Phase A: Normalization & Fingerprinting (Client-Side / Java)
-Before any network call is made to Solr, the Java Orchestrator performs local deduplication to reduce API load.
+## Current implementation limits
 
-**The Algorithm (Key Collision):**
-We utilize the **OpenRefine Fingerprint** method:
-1.  **Tokenize:** Split string by whitespace.
-2.  **Clean:** Remove punctuation and control characters.
-3.  **Lowercase:** Convert all tokens to lowercase.
-4.  **Sort:** Alphabetize the tokens.
-5.  **Deduplicate:** Remove duplicate tokens.
-6.  **Join:** Reassemble into a normalized string.
+- The method `parseSolrResponse(String jsonBody)` creates a JSON object but contains a TODO-style placeholder and returns an **empty candidate list**. Consequently, the Java reconciliation funnel cannot be claimed functional as delivered.
+- The design document described a particular OpenRefine fingerprinting algorithm and Redis deduplication, but the observed Java orchestrator does not execute that algorithm; `Cell.fingerprint` exists as a field. Treat deduplication/cache behavior as **intended**, not demonstrated.
+- Solr schemas and the included OpenTapioca project are not evidence that a Wikidata index with millions of aliases has been built or populated.
+- There is no measured evidence for the older **under-50-ms** latency claim.
 
-> **Example:**
-> * Input 1: "The  University  of... Oxford."
-> * Input 2: "Oxford, University of"
-> * **Fingerprint (Both):** `of oxford university`
->
-> *Result:* Both inputs map to the same Cache Key. We query Solr once, not twice.
+## Configuration and verification
 
-### Phase B: The FST Tagger (Server-Side / Solr)
-We do not use standard Lucene text search (TF-IDF). We use the **Solr TaggerHandler**.
+- Review `docker-compose.yml`, `server/solr/sentient-tapioca/`, and `config/solr/tapioca_schema.xml` for the actual development core layout.
+- Confirm the `solr-precreate` step succeeds, populate the index with test data, and probe the tag endpoint directly.
+- Implement and test the Solr JSON response mapping to `ReconCandidate` before enabling any end-to-end status claims.
+- Check the exact Solr URL and request timeout assigned to the Java core at runtime; they are not safely inferred from the conceptual topology.
 
-* **Mechanism:** The entire dictionary of Wikidata labels and aliases (~14M items) is compiled into a **Finite State Transducer (FST)** in memory.
-* **Operation:** The raw text acts as a cursor traversing the FST graph.
-* **Performance:** Lookup time is $O(k)$ where $k$ is the length of the input text, independent of the index size.
-
-
-
-### Phase C: The Authority Filter (Pruning)
-Solr returns candidates. We immediately discard any candidate that:
-1.  Has a `popularity_score` < 100 (log-likelihood threshold).
-2.  Is a "Stop Word" entity (e.g., "The" -> Band "The", "To" -> TV Show "To") unless exact capitalization matches.
-
----
-
-## 3. Configuration & Schemas
-
-### 3.1. Artificial Aliases (The OpenTapioca Strategy)
-To make Solr "smart" without NLP, we inject metadata into the `text` field during the build process. This allows users to search by IDs as if they were names.
-
-| Input Type | Raw Value | Indexed As (Solr `text`) | Resolved QID |
-| :--- | :--- | :--- | :--- |
-| **Label** | "Douglas Adams" | `douglas adams` | Q42 |
-| **Twitter** | "@dna" | `@dna` | Q42 |
-| **IMDb** | "nm0000726" | `nm0000726` | Q42 |
-| **GRID ID** | "grid.4991.5" | `grid.4991.5` | Q42 |
-
-### 3.2. Solr Request Parameters
-The Java Orchestrator must call Solr with these exact parameters to enable FST mode:
-
-```http
-POST /solr/sentient-tapioca/tag?overlaps=NO_SUB&tagsLimit=5000&fl=id,label,popularity_score,types
-Content-Type: text/plain
-
-<Raw Text Body>
+See [Architecture](00_ARCHITECTURE_BLUEPRINT.md) and [QA](07_QA_AND_VALIDATION.md).

@@ -1,124 +1,44 @@
-# Data Dictionary & Type Mapping
-**Artifact:** `SmartCell` Protocol  
-**Schema Source:** `schemas/data/smart_cell.json`  
-**Role:** The immutable contract between Java, Python, and the UI.
+# Data dictionary and wire-contract boundaries
 
----
+**Snapshot reviewed:** October 27, 2026
 
-## 1. Introduction
-In SenTient, data is never a primitive string. It is always encapsulated in a **SmartCell**.
-This document defines the strict typing required to marshall/unmarshall this object across the three application layers.
+Three distinct representations appear in this repository. They are **not automatically interchangeable**:
 
-**Golden Rule:** If a field is not defined here, it must be stripped before serialization.
+1. **Logical SmartCell contract:** `schemas/data/smart_cell.json`.
+2. **Java OpenRefine-derived object:** `modules/core/src/com/google/refine/model/Cell.java` and `Recon.java`.
+3. **Falcon API payload:** request/response constructed in `src/main.py`.
 
----
+## Logical SmartCell schema
 
-## 2. Type Mapping Matrix
+`schemas/data/smart_cell.json` declares fields including `id`, `raw_value`, `fingerprint`, `status`, and `consensus_score` as required; additional fields describe candidates and provenance. It defines an **intended interchange schema**, not evidence that the Java `Cell` serializer produces it.
 
-| Logical Field | JSON Type | Java Type (`com.google.refine.*`) | Python Type (`falcon_service`) | TypeScript Interface |
-| :--- | :--- | :--- | :--- | :--- |
-| `id` | `UUID (String)` | `java.util.UUID` | `str` | `string` |
-| `raw_value` | `String` | `String` | `str` | `string` |
-| `status` | `Enum (String)` | `Recon.Judgment` | `str` (Literal) | `CellStatus` |
-| `consensus_score` | `Float` | `float` (transient) | `float` | `number` |
-| `fingerprint` | `String` | `String` | `str` | `string` |
-| `candidates` | `Array<Obj>` | `List<ReconCandidate>` | `List[dict]` | `Candidate[]` |
-| `vector` | `Array<Float>` | `double[]` | `np.ndarray` | `number[]` |
+## Java serialization
 
----
+| Java model | JSON name | Meaning |
+| --- | --- | --- |
+| `Cell.value` | `v` | Cell value |
+| `Cell.recon` | `r` | Reconciliation state |
+| `Cell.id` | `id` | UUID-like tracking ID |
+| `Cell.fingerprint` | `fp` | Optional fingerprint; generation is not shown in `Cell` |
+| `Recon.judgment` | `j` | `none`, `matched`, `new`, `ambiguous` |
+| `Recon.match` | `m` | Selected candidate |
+| `Recon.matchRank` | `score` | Match score field |
 
-## 3. The SmartCell Core Object
+The Java `Recon` fields `candidates`, `consensusScore`, and `features` are `transient` and marked `@JsonIgnore`, while the logical SmartCell schema expects differently named fields. The sidecar serializes candidates/features separately into JSON. A translation layer is required for reliable schema compliance; one is not established by this snapshot.
 
-The root container for all cell data.
+## Python Falcon API
 
-### `id`
-* **Description:** Unique, random identifier assigned at creation. Used to map asynchronous NLP results back to the UI row.
-* **Format:** UUID v4.
-* **Nullable:** No.
+Request keys: `surface_form` (string), `context_window` (list), `candidates` (list of IDs), and optional `limit` (integer-like parameter). Response keys: `inferred_property` and `ranked_candidates` with `id`, `falcon_score`, `semantic_reason`. These are the keys generated in the actual Flask endpoint.
 
-### `raw_value`
-* **Description:** The original, immutable user input.
-* **Source:** User Upload (CSV/Excel).
-* **Note:** This field is **never** modified by the AI. We only modify the `reconciliation` object attached to it.
+Do not confuse `falcon_score` with the Java weighted **consensus score**. Their calculations and semantics are different.
 
-### `fingerprint`
-* **Description:** The "Key Collision" string used for local clustering.
-* **Logic:** `lowercase(sort(tokenize(raw_value)))`.
-* **Example:** "The Beatles" -> `beatles the`.
+## Persistence schema
 
-### `status`
-* **Description:** The current state of the cell in the lifecycle.
-* **Allowed Values:**
-    * `NEW`: No reconciliation attempted.
-    * `PENDING`: Sent to Solr/Falcon, awaiting Async response.
-    * `AMBIGUOUS`: Returned with multiple candidates (Score 0.40 - 0.85).
-    * `MATCHED`: Confirmed link to a QID (Score > 0.85 or User Action).
-    * `REVIEW_REQUIRED`: Auto-matched but flagged by Scrutinizers (QA Error).
+The Java sidecar writes row-level state to `sentient_recon`, keyed by `(project_id, row_index)`, with `judgment`, `consensus_score`, `heavy_payload`, and `processed_at`. It also defines `sentient_feedback` for manual corrections. The file `config/storage/duckdb_schema.sql` is a separate artifact; validate migration/compatibility rather than assuming schema parity.
 
-### `consensus_score`
-* **Description:** The final calculated confidence.
-* **Range:** `0.0` to `1.0`.
-* **Calculation:** Computed in Java after receiving Python payload.
-* **Critical:** If `null`, the UI displays "Processing...".
+## Verification checklist
 
----
-
-## 4. The Reconciliation Object (`recon`)
-
-This sub-object contains the "AI Opinion".
-
-### `match` (The Golden Record)
-* **Type:** `Candidate` Object (Nullable).
-* **Description:** The single winning entity. If this exists, the cell is considered "Reconciled".
-
-### `candidates`
-* **Type:** List of `Candidate` Objects.
-* **Description:** The top $N$ suggestions (default 3) returned by the funnel.
-* **Sort Order:** Descending by `consensus_score`.
-
----
-
-## 5. The Candidate Object
-
-A potential match (e.g., "Paris (Q90)").
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | `String` | The Wikidata QID (Must match regex `^Q[0-9]+$`). |
-| `label` | `String` | The official label from Wikidata. |
-| `types` | `Array<String>` | List of "Instance Of" QIDs (e.g., `["Q5", "Q3618"]`). |
-| `description` | `String` | Short description text (e.g., "Capital of France"). |
-| `features` | `Object` | The raw scores used for debugging/visualization. |
-
-### `features` Breakdown (Telemetry)
-* `tapioca_popularity` (`float`): Raw Log-Likelihood from Solr.
-* `falcon_context` (`float`): Cosine Similarity (0-1) from SBERT.
-* `levenshtein_distance` (`float`): Normalized string distance (0-1).
-
----
-
-## 6. The NLP Context Object (`nlp_context`)
-
-Data extracted by Falcon 2.0 to justify the decision.
-
-### `surrounding_ngrams`
-* **Type:** `Array<String>`
-* **Description:** The context window used for vectorization.
-* **Example:** `["born", "in", "honolulu"]` for entity "Barack Obama".
-
-### `inferred_property`
-* **Type:** `String` (PID)
-* **Description:** The Wikidata Property ID that Falcon detected in the sentence.
-* **Example:** `P19` (place of birth).
-* **Use Case:** The UI highlights this property to show *why* the entity was chosen.
-
----
-
-## 7. Pipeline Trace (`pipeline_trace`)
-
-Metadata for debugging distributed transactions.
-
-* `job_id`: The ThreadPoolExecutor ID.
-* `tapioca_latency_ms`: Time spent in Layer 1.
-* `falcon_latency_ms`: Time spent in Layer 2.
-* `engine_version`: Version of the model used (e.g., "Sentient-v1.0").
+- Generate a JSON example from the actual Java serializer and validate against `schemas/data/smart_cell.json`.
+- Add a mapping test for statuses and score units (Java candidate score is multiplied by **100**; recon consensus is **0–1**).
+- Test persisted/rehydrated candidate fidelity and manual-correction provenance.
+- Do not assert `UNRESOLVED`, `BLOCKED`, or `REVIEW_REQUIRED` are executable `Recon.Judgment` values; these names appear in older design docs but not in the Java enum supplied.

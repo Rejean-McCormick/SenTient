@@ -1,72 +1,44 @@
-# Wiring & Configuration Strategy
-**Component:** System Orchestration  
-**Config Source:** `config/orchestration/environment.json`  
-**Role:** Network Topology, IPC Protocols, and Startup Sequence.
+# Wiring, ports, and configuration
 
----
+**Snapshot reviewed:** October 27, 2026
 
-## 1. Network Topology (The Port Map)
+## Docker Compose topology (as checked in)
 
-SenTient is a distributed system running on `localhost`. Strict port discipline is enforced to prevent conflicts.
+| Compose service | Internal service name | Host-published port | Purpose |
+| --- | --- | --- | --- |
+| `solr` | `sentient_solr` | `127.0.0.1:8983` | Candidate index/tagging |
+| `opentapioca` | `sentient_opentapioca` | `127.0.0.1:8080` | OpenTapioca container |
+| `elasticsearch` | `sentient_elastic` | `127.0.0.1:9200` | Semantic index |
+| `redis` | `sentient_redis` | `127.0.0.1:6379` | Redis service |
+| `falcon` | `sentient_falcon` | `127.0.0.1:5005` | Python HTTP API |
+| `core` | `sentient_core` | `127.0.0.1:3333` | Java core image/launcher |
 
-| Service | Role | Port | Protocol | Bound Interface |
-| :--- | :--- | :--- | :--- | :--- |
-| **Java Core** | Orchestrator / UI | `3333` | HTTP/1.1 | `127.0.0.1` |
-| **Falcon (Python)** | NLP Service | `5005` | HTTP/1.1 | `127.0.0.1` |
-| **Solr (Tapioca)** | Fast Tagger | `8983` | HTTP/2 | `127.0.0.1` |
-| **ElasticSearch** | Context Store | `9200` | HTTP/TCP | `127.0.0.1` |
-| **Redis** | Result Cache | `6379` | TCP | `127.0.0.1` |
+These are **host** bindings. Inside Docker, services communicate over `sentient_net` using container/service DNS; `127.0.0.1` inside a container is not the host or another container.
 
-> **Security Note:** All services are bound strictly to `127.0.0.1`. No external traffic is allowed directly to Solr, Elastic, or Python. All external requests MUST go through the Java Core (Port 3333).
+## Configuration source of truth
 
----
+- `docker-compose.yml`: declared development services, network, volumes, ports, and startup dependencies.
+- `config/nlp/falcon_settings.yaml`: actual values read by `src/main.py` for model, Elasticsearch hosts/index names, stopwords, candidate limit, and Flask host/port.
+- `config/orchestration/environment.json`: intended global registry, **not proof** that all programs read it at runtime.
+- `config/core/butterfly.properties`: misleading filename; its contents use YAML-like syntax and do not provide the `sentient.layer*` Java property keys shown in `SenTientOrchestrator.java`.
+- `config/elastic/falcon_mapping.json` and `server/solr/sentient-tapioca/`: index/core definitions; do not imply populated indexes.
 
-## 2. Inter-Process Communication (IPC)
+## Starting and diagnosing the development stack
 
-The Java Core acts as the "Master" node. It communicates with "Worker" nodes via specific protocols defined in `butterfly.properties`.
+```bash
+docker compose config
+# Only after reviewing the configuration and prerequisites:
+docker compose up --build
+```
 
+Startup is **not guaranteed** by this snapshot. `Dockerfile.falcon` attempts `COPY data/models /app/data/models`, but `data/models/` was absent from the supplied archive. `core` runs `./refine` under an Eclipse Temurin JDK image without a verified built Java package. The frontend is not a Compose service here.
 
+When Falcon is running, inspect `GET http://127.0.0.1:5005/api/v1/health` and the `elasticsearch_connected` field; the static `healthy` status alone is not sufficient. Keep Elasticsearch off public networks: Compose explicitly configures `xpack.security.enabled=false`. Do not publish or port-forward these services without an appropriate security design.
 
-### 2.1. Link A: Java -> Solr (Layer 1)
-* **Purpose:** High-speed entity spotting.
-* **Client:** `org.apache.solr.client.solrj.impl.Http2SolrClient`
-* **Concurrency:** Highly parallel. Java sends async batches.
-* **Timeout:** **Strict 500ms**.
-    * *Logic:* If Solr takes >500ms, the FST logic is stuck. Fail fast and mark cell as `UNRECONCILED` rather than blocking the UI.
+## Common mismatches to check
 
-### 2.2. Link B: Java -> Falcon (Layer 2)
-* **Purpose:** Deep semantic analysis.
-* **Client:** `java.net.http.HttpClient` (Java 11+).
-* **Concurrency:** Throttled (Max 4 concurrent requests).
-    * *Logic:* Python is CPU-bound (SBERT vectors). Flooding it causes thrashing.
-* **Timeout:** **Loose 120s**.
-    * *Logic:* Vector calculations take time. We wait.
-
-### 2.3. Link C: Python -> ElasticSearch
-* **Purpose:** Fetching property context vectors.
-* **Client:** `elasticsearch-py`.
-* **Protocol:** Persistent TCP connection (Keep-Alive).
-
----
-
-## 3. File System Layout (Physical Wiring)
-
-The application expects a specific directory structure relative to `SENTIENT_HOME`.
-
-```text
-SENTIENT_HOME/
-├── refine                 # The specific Java startup shell script
-├── refine.ini             # JVM Memory arguments (-Xmx)
-├── config/                # THE NERVE CENTER
-│   ├── core/butterfly.properties        # Java Settings
-│   ├── nlp/falcon_settings.yaml         # Python Settings
-│   ├── solr/tapioca_schema.xml          # Solr Schema
-│   ├── elastic/falcon_mapping.json      # Elastic Schema
-│   └── orchestration/environment.json   # Global Paths
-├── modules/               # Core logic (Refine)
-├── extensions/            # Plugins (Wikibase, JDBC)
-├── solr/                  # Embedded Solr Server
-├── python_venv/           # Python Virtual Environment
-└── data/
-    ├── workspace/         # User Project Data (JSON/History)
-    └── models/            # SBERT models & Stopwords
+1. Java's configured Solr URL must produce a valid `.../tag` endpoint for the `sentient-tapioca` core.
+2. Java's configured Falcon URL must lead to `/api/v1/disambiguate`, not just `/disambiguate` at the server root.
+3. `Dockerfile.falcon` uses an explicit **one-worker** Gunicorn command despite a `FALCON_WORKERS=4` environment setting in Compose.
+4. The Python settings use `http://sentient_elastic:9200`, consistent with the container name; do not substitute host loopback inside containers.
+5. Ensure writable directories and data volumes exist; check per-container healthchecks separately from functional integration tests.

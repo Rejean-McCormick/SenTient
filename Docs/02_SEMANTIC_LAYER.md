@@ -1,100 +1,59 @@
-# Layer 2: The Semantic Linguist (Falcon 2.0)
+# Falcon contextual disambiguation service
 
-**Component:** `nlp_falcon`  
-**Technology:** Python 3.9+, Flask, ElasticSearch, SBERT (Sentence-BERT)  
-**Latency Budget:** ~200ms per entity batch (Target) / 15s (Hard Limit)
+**Snapshot reviewed:** October 27, 2026  
+**Source entry point:** `src/main.py`  
+**Configured model:** `all-MiniLM-L6-v2` in `config/nlp/falcon_settings.yaml`.
 
----
+## Available source-level endpoints
 
-## 1. Overview
+- `GET /api/v1/health`: returns `status`, `service`, `model`, and `elasticsearch_connected`. Note that the literal `status: healthy` is returned even when Elasticsearch ping is false; examine the boolean separately.
+- `POST /api/v1/disambiguate`: accepts candidate IDs and context and returns a ranked list.
 
-While Layer 1 (Solr) finds strings that *look like* entities, **Layer 2 (The Linguist)** determines if they *make sense* in the current sentence.
+Example request:
 
-**Philosophy:** "Context is King."  
-This layer solves the "Paris Problem":
-
-* Input: *"The Paris Hilton hotel is expensive."*
-* Layer 1 sees: "Paris" (City? Person?), "Hilton" (Hotel? Person?).
-* **Layer 2 decides:** The proximity of "hotel" vectors suggests "Paris" is a location/brand modifier, not the capital of France.
-
-
-
----
-
-## 2. The Processing Pipeline
-
-The Python service (`src/main.py`) executes a 3-step NLP pipeline for every "Ambiguous" batch received from the Java Core.
-
-
-
-### Phase A: The "Compression" (Stopwords & N-Grams)
-
-Before expensive vector math, we clean the signal using the **Falcon Optimization**:
-
-1.  **Tokenization:** Split sentence into words.
-2.  **Stopword Pruning:** Remove non-semantic noise ("the", "is", "at") using `data/stopwords/falcon_extended_en.txt`.
-    * *Note:* This list acts as a shared resource; users can update this file to filter domain-specific noise (e.g., "patient", "sample").
-3.  **N-Gram Generation:** Create sliding windows of tokens (size 1 to 6) to detect compound predicates (e.g., "Mayor of" -> `P6`).
-
-### Phase B: Property Extraction (The Edge Detector)
-
-Uniquely, SenTient tries to find the **Relationship (Predicate)** before confirming the **Entity (Subject)**.
-
-* **Mechanism:** The N-Grams are queried against the `sentient_properties_v1` ElasticSearch index.
-* **Query:** Matches `label` (fuzzy) and `usage_count` (boost).
-* **Result:** If we find "buried in" (P119), we boost candidate entities that are *Locations* (Q2221906) and penalize *People*.
-
-### Phase C: Contextual Vector Scoring (The SBERT Model)
-
-This is the heavy lifting. We calculate the pure semantic distance between the user's row context and the candidate's Wikidata description.
-
-1.  **Embedding:** The context window (surrounding 5 words) is encoded into a 768-dimensional vector using `all-MiniLM-L6-v2`.
-2.  **Retrieval:** We fetch the pre-encoded description vectors of the candidates from ElasticSearch (`sentient_entities_fallback`).
-3.  **Cosine Similarity:**
-    $$S_{Context} = \frac{A \cdot B}{\|A\| \|B\|}$$
-    * Where $A$ is the input context vector and $B$ is the candidate description vector.
-    * **Output:** A raw float between `0.0` (No relation) and `1.0` (Perfect semantic match).
-
-
-
-> **Architectural Note:** This layer does **NOT** apply Levenshtein string distance penalties. That calculation is strictly reserved for the Java Core (Layer 3) to allow independent visualization of "Spelling vs. Meaning" in the UI. Ensure `ranking.levenshtein.enabled` is set to `false` in `falcon_settings.yaml`.
-
----
-
-## 3. Data Integration (ElasticSearch)
-
-Layer 2 relies on two specific indices in ElasticSearch.
-
-### 3.1. `sentient_properties_v1`
-
-Stores Wikidata Properties (P-items).
-
-* **Mapping:** defined in `config/elastic/falcon_mapping.json`.
-* **Key Fields:**
-    * `label`: "place of birth"
-    * `expected_types`: ["Q5"] (indicates this property usually applies to humans).
-    * `context_vector`: Dense Vector of the property description.
-
-### 3.2. `sentient_entities_fallback`
-
-A partial mirror of Wikidata entities used *only* for re-ranking descriptions.
-
-* **Why?** Solr (Layer 1) is optimized for IDs and Labels, not long text descriptions. Elastic holds the descriptions for vector comparison.
-
----
-
-## 4. API Interface (Internal)
-
-The Java Orchestrator talks to the Python Layer via REST.
-
-**Endpoint:** `POST http://127.0.0.1:5005/api/v1/disambiguate`
-
-**Request Payload:**
+```http
+POST /api/v1/disambiguate
+Content-Type: application/json
+```
 
 ```json
 {
   "surface_form": "Paris",
   "context_window": ["Hilton", "hotel", "expensive"],
-  "candidates": ["Q90", "Q47796", "Q167646"],
-  "limit": 3
+  "candidates": ["Q90", "Q47796"],
+  "limit": 2
 }
+```
+
+Example response **shape only** (not a real model result):
+
+```json
+{
+  "inferred_property": null,
+  "ranked_candidates": [
+    {"id": "Q90", "falcon_score": 0.42, "semantic_reason": "Context match: 42%"}
+  ]
+}
+```
+
+## What the main endpoint does
+
+1. Loads settings and initializes Sentence Transformers and an Elasticsearch client at module import time.
+2. Filters context tokens using `data/stopwords/falcon_extended_en.txt`.
+3. Searches the configured property index for a fuzzy label match and an optional `pid`.
+4. Fetches candidate descriptions with Elasticsearch `mget`.
+5. Embeds the **input surface form plus filtered context** and each candidate description (or falls back to the surface form), computes cosine similarity, clamps scores to **0–1**, then sorts descending.
+6. Limits processing to `min(request.limit, thresholds.max_candidates)`, where the checked-in configuration sets **3** as the maximum.
+
+`src/falcon/pipeline.py` and `src/falcon/preprocessing.py` define additional pipeline classes, but `src/main.py` implements its own route logic; it does not call `FalconPipeline.run` in this snapshot. Do not describe those classes as executing automatically within the Flask handler.
+
+## Caveats and deployment
+
+- The old claim that this model produces **768-dimensional embeddings** is inaccurate for the configured MiniLM-L6-v2 model (384 dimensions).
+- Description vectors are computed by the route; it does **not** read precomputed vectors from Elasticsearch as the old document claimed.
+- The Elasticsearch indices `sentient_properties_v1` and `sentient_entities_fallback` are named in config; this archive does not prove they are populated.
+- `src/main.py` creates `logs/falcon_service.log` on import. Direct execution requires a writable `logs/` directory, whereas `Dockerfile.falcon` creates one.
+- `Dockerfile.falcon` specifies one Gunicorn worker, while `docker-compose.yml` advertises `FALCON_WORKERS=4` as an environment variable; the explicit Docker command determines the worker count unless modified.
+- The Java orchestrator builds its Falcon path by appending `/disambiguate` to a configurable base URL. Confirm it resolves to **`/api/v1/disambiguate`** before testing integration.
+
+No production latency or classification quality is established by these source files. See [QA](07_QA_AND_VALIDATION.md).
