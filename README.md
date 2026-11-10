@@ -73,3 +73,7 @@ Start with [Architecture](Docs/00_ARCHITECTURE_BLUEPRINT.md), [API and frontend]
 ## License and third-party code
 
 The repository embeds and adapts components with their own licensing and attribution requirements. Consult the applicable source directories and their license files before redistribution.
+
+## Branch 02 final-system alignment (2026-11-09)
+
+See [the English functional handoff and qualification limits](Docs/08_BRANCH02_SEMANTIC_CANDIDATE_BOUNDARY.md). This is an additive, owner-scoped alignment; no canonical state, public release or production deployment is implied.
